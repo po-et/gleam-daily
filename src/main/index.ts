@@ -1,6 +1,9 @@
 // app 入口：单实例锁、窗口/托盘装配、IPC 注册。
 import { app, globalShortcut } from 'electron';
 import { registerIpcHandlers } from './ipc';
+import { registerMcpIpc } from './mcp/register';
+import { initMcp } from './mcp/server';
+import { initScheduler } from './scheduler';
 import { initScreenshotsCleanup, setScreenshotsEnabled, stopScreenshots } from './screenshots';
 import { getSettings } from './settings';
 import { createTray, destroyTray, refreshTrayMenu } from './tray';
@@ -35,6 +38,11 @@ if (!gotLock) {
     setScreenshotsEnabled(settings.screenshots.enabled);
     // 24h 失败/悬挂截图清理与「截图功能当前是否开启」无关，无条件启动一次。
     initScreenshotsCleanup();
+    // v1.3：定时日报调度 + 记忆自动刷新（30s tick，见 scheduler.ts）。
+    initScheduler();
+    // v1.3：MCP Server（默认关闭；settings.mcp.enabled 时启动，仅绑定 127.0.0.1）。
+    registerMcpIpc();
+    initMcp();
 
     const registered = globalShortcut.register('Alt+Command+N', () => {
       createQuickNoteWindow();

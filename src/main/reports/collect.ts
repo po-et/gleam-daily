@@ -1,7 +1,18 @@
 // 汇集某时段的素材 -> ReportMaterial。见 docs/SPEC.md §10。
 import { CATEGORY_META } from '../../shared/categories';
-import type { Category, GitCommit, MaterialPreview, Note, Report, ReportGenOptions, ReportType, ScreenshotAnalysis, Session } from '../../shared/types';
-import { getCommits, getScreenshotAnalyses, getSessions, listNotes, listReports } from '../db';
+import type {
+  Category,
+  GitCommit,
+  ManualRecord,
+  MaterialPreview,
+  Note,
+  Report,
+  ReportGenOptions,
+  ReportType,
+  ScreenshotAnalysis,
+  Session,
+} from '../../shared/types';
+import { getCommits, getScreenshotAnalyses, getSessions, listManualRecords, listNotes, listReports } from '../db';
 
 const SCREENSHOT_SAMPLE_LIMIT = 60;
 
@@ -13,6 +24,7 @@ export interface ReportMaterial {
   screenshotsText: string;
   commitsText: string;
   notesText: string;
+  manualRecordsText: string;
   preview: MaterialPreview;
 }
 
@@ -148,6 +160,20 @@ function formatNotes(notes: Note[]): string {
     .join('\n');
 }
 
+/** 手动补录（含传图识别，source=image）：用户主观补充，优先级最高，可直接采信。 */
+function formatManualRecords(records: ManualRecord[]): string {
+  if (records.length === 0) return '（无手动补录）';
+  return [...records]
+    .sort((a, b) => a.ts - b.ts)
+    .map((r) => {
+      const catLabel = CATEGORY_META[r.category]?.label ?? r.category;
+      const sourceTag = r.source === 'image' ? '[图]' : '';
+      const titlePart = r.title ? `${r.title}：` : '';
+      return `- ${formatTime(r.ts)} ${sourceTag}（${catLabel}）${titlePart}${r.content}`;
+    })
+    .join('\n');
+}
+
 /** weekly/monthly：逐天检查是否已有 daily 报告，有则直接复用 contentMd（高质量素材）；没有则用当天原始数据聚合回退。 */
 function buildTimelineForPeriod(type: ReportType, start: string, end: string, sessions: Session[]): { text: string; dailyReportCount: number } {
   if (type === 'daily') {
@@ -192,6 +218,7 @@ export async function collectMaterial(opts: ReportGenOptions): Promise<ReportMat
   const screenshots = getScreenshotAnalyses(startTs, endTsExclusive);
   const commits = getCommits(startTs, endTsExclusive);
   const notes = listNotes(startTs, endTsExclusive);
+  const manualRecords = listManualRecords(startTs, endTsExclusive);
 
   const { text: timelineText, dailyReportCount } = buildTimelineForPeriod(opts.type, start, end, sessions);
 
@@ -204,6 +231,7 @@ export async function collectMaterial(opts: ReportGenOptions): Promise<ReportMat
     screenshotCount: analyzedScreenshotCount,
     commitCount: commits.length,
     noteCount: notes.length,
+    manualRecordCount: manualRecords.length,
     dailyReportCount,
   };
 
@@ -214,6 +242,7 @@ export async function collectMaterial(opts: ReportGenOptions): Promise<ReportMat
     screenshotsText: formatScreenshots(screenshots),
     commitsText: formatCommits(commits),
     notesText: formatNotes(notes),
+    manualRecordsText: formatManualRecords(manualRecords),
     preview,
   };
 }

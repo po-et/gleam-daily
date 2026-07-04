@@ -17,6 +17,48 @@ export const IPC_CHANNELS = {
     listNotes: 'data:listNotes',
     deleteNote: 'data:deleteNote',
     collectCommits: 'data:collectCommits',
+    // v1.3 手动记录 + 自动 session 编辑 + 传图识别（SPEC §17.C）
+    addManualRecord: 'data:addManualRecord',
+    listManualRecords: 'data:listManualRecords',
+    updateManualRecord: 'data:updateManualRecord',
+    deleteManualRecord: 'data:deleteManualRecord',
+    updateSessionCategory: 'data:updateSessionCategory',
+    deleteSession: 'data:deleteSession',
+    importImage: 'data:importImage',
+  },
+  // v1.3 统计（SPEC §17.B）
+  stats: {
+    getOverview: 'stats:getOverview',
+    getHeatmap: 'stats:getHeatmap',
+    getHourMatrix: 'stats:getHourMatrix',
+    getTopApps: 'stats:getTopApps',
+    getCategoryTotals: 'stats:getCategoryTotals',
+  },
+  // v1.3 记忆（SPEC §17.A）
+  memory: {
+    get: 'memory:get',
+    update: 'memory:update',
+    refresh: 'memory:refresh',
+    refreshPreview: 'memory:refreshPreview',
+  },
+  // v1.3 导出导入（SPEC §17.D）
+  dataMgmt: {
+    exportAll: 'dataMgmt:exportAll',
+    importAll: 'dataMgmt:importAll',
+  },
+  // v1.3 定时日报（SPEC §17.E）
+  scheduledReport: {
+    getStatus: 'scheduledReport:getStatus',
+    runNow: 'scheduledReport:runNow',
+  },
+  // v1.3 识别当前屏幕（SPEC §17.F）
+  capture: {
+    analyzeNow: 'capture:analyzeNow',
+  },
+  // v1.3 MCP（SPEC §17.G）
+  mcp: {
+    getStatus: 'mcp:getStatus',
+    getLogs: 'mcp:getLogs',
   },
   reports: {
     preview: 'reports:preview',

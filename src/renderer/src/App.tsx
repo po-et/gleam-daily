@@ -4,6 +4,7 @@ import Sidebar, { type PageKey } from './components/Sidebar';
 import { ToastProvider } from './components/Toast';
 import Today from './pages/Today';
 import Reports from './pages/Reports';
+import Stats from './pages/Stats';
 import Materials from './pages/Materials';
 import SettingsPage from './pages/Settings';
 import QuickNote from './pages/QuickNote';
@@ -48,6 +49,7 @@ function useThemeSync(): void {
 const PAGES: Record<PageKey, () => JSX.Element> = {
   today: Today,
   reports: Reports,
+  stats: Stats,
   materials: Materials,
   settings: SettingsPage,
 };

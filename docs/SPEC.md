@@ -387,3 +387,113 @@ Windows 支持、多显示器截图、日历接入、企业协作、开机自启
 8. 清除所有数据后各页空态正常。
 9. `npm run build:mac` 产出 .app，双击可启动并正常记录（ad-hoc 签名）。
 10. 深浅色主题切换正常，UI 与 DESIGN.md 一致。
+
+---
+
+## 17. v1.3 增量规格（调研小黑日报后确定的 7 个新功能）
+
+> 本节契约与 §4/§5 同级：types/ipc-channels/preload 的增量已由设计者直接写入代码，实施时**只对齐、不修改**契约层。
+> 范围：A 记忆引擎 / B 统计页 / C 时间线可编辑+传图识别 / D 数据导出导入 / E 定时日报 / F 识别当前屏幕 / G MCP Server。
+
+### 17.0 数据库增量（db.ts，additive migration，无需版本表）
+
+```sql
+CREATE TABLE IF NOT EXISTS manual_records (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts INTEGER NOT NULL,              -- 记录时间点（epoch ms，用户可改）
+  category TEXT NOT NULL,
+  title TEXT NOT NULL DEFAULT '',
+  content TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'manual',  -- 'manual' | 'image'
+  created_ts INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_manual_records_ts ON manual_records(ts);
+
+CREATE TABLE IF NOT EXISTS meta (   -- 通用 KV：记忆、调度器状态等
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+```
+
+meta 键约定：`memory.content`（markdown 字符串）、`memory.updatedTs`（数字字符串）、`scheduler.lastRunDate`（'YYYY-MM-DD'）、`scheduler.lastResult`（JSON 字符串，形如 ScheduledReportStatus 的 lastResult/lastMessage 字段）。db.ts 提供 `getMeta(key): string | null` / `setMeta(key, value)`。
+
+sessions 表新增操作：`updateSessionCategory(id, category)`、`deleteSession(id)`。
+clearAllData() 追加清空 manual_records 与 meta。
+
+### 17.A 记忆引擎（src/main/memory.ts）
+
+目的：AI 从历史记录提炼「个人工作画像」（项目/产品标准名、技术栈、协作对象、工作习惯、术语对照），注入截图分析与报告生成 prompt，解决 AI 认错项目名/术语的问题。
+
+- 存储：meta 表（见 17.0）。内容为 markdown，注入时截断到 2000 字符。
+- `refreshPreview()`：统计近 30 天素材（sessions 聚合行数、截图摘要条数、速记条数、提交条数、素材总字数），不调 AI。
+- `refreshMemory()`：素材（近 30 天，按天聚合压缩，总量截断 16000 字符）+ 现有记忆 → 文本 provider → 新记忆存 meta。Prompt（prompts.ts 新增 `buildMemoryPrompt`）：
+  - system：`你是个人工作记忆整理助手。基于用户的工作记录素材，整理一份简洁的个人工作画像，供后续 AI 识别屏幕内容和撰写日报时参考。输出 Markdown，仅包含以下小节（无内容的小节省略）：## 项目与产品（标准名称，括号内列常见别名/误写）、## 技术栈与工具、## 常用协作对象、## 工作习惯、## 术语对照。全文不超过 500 字。只能基于素材归纳，禁止虚构。直接输出 Markdown，不要解释。`
+  - user：现有记忆（如有，标注「已有记忆，请在其基础上增量更新」）+ 素材。
+- 注入点（settings.memory 开关控制）：
+  - `injectToVision`：截图分析 prompt 前拼 `【用户工作记忆，识别时优先使用其中的标准名称】\n{memory}\n---\n`。
+  - `injectToReports`：报告 user prompt 素材段之前拼同样块（文案改「撰写报告时优先使用其中的标准名称」）。
+- 自动刷新：scheduler（17.E）顺带负责——每次 tick 检查 `settings.memory.autoRefresh`（'off'|'daily'|'weekly'），距 updatedTs 超过 24h/7d 且当前 provider 可用 → 静默 refreshMemory()，失败仅 console.warn 不打扰用户。
+- IPC：`memory.get/update/refresh/refreshPreview`（见契约层）。update 即用户手动编辑保存。
+
+### 17.B 统计（src/main/stats.ts + 渲染层 Stats 页）
+
+全部基于 sessions 表按本地时区聚合；跨天 session 按天边界切分后归属。查询实现：一次取范围内 sessions，JS 内切分聚合（365 天量级 ≤ 数万行，可接受）。
+
+- `getOverview(): StatsOverview` —— streakDays：从今天（或昨天，若今天尚无记录）向前连续「有任一 session」的天数；totalActiveDays：历史有记录天数；avgDailyActiveMs30d：近 30 天有记录日的平均活跃时长；totalSessions/totalScreenshots/totalReports：累计行数。
+- `getHeatmap(days): HeatmapDay[]` —— 截止今天共 days 天（365），每天 activeMs（无记录=0，date 连续无空洞）。
+- `getHourMatrix(days): number[][]` —— 7×24 矩阵（`[weekday][hour]`，weekday 0=周一…6=周日），近 days 天每格累计活跃 ms。
+- `getTopApps(days): TopApp[]` —— 近 days 天按 app 聚合活跃 ms，降序前 15，含每 app 主分类（时长最多的 category）。
+- `getCategoryTotals(days): Partial<Record<Category, number>>`。
+- IPC：`stats.getOverview/getHeatmap/getHourMatrix/getTopApps/getCategoryTotals`。
+
+### 17.C 时间线可编辑 + 手动补录 + 传图识别
+
+- 手动记录 ManualRecord（表见 17.0）参与：今日页时间线展示（与 session 块并列，用「✎/🖼 来源角标」区分）、素材页活动 Tab、报告素材（collect.ts 新增 manualRecords，prompt 中列为「手动补录」小节，MaterialPreview 增 manualRecordCount）。
+- IPC：`data.addManualRecord/listManualRecords/updateManualRecord/deleteManualRecord`；自动 session 的 `data.updateSessionCategory/deleteSession`（删除仅删该聚合行，不影响截图/速记）。
+- 传图识别 `data.importImage(source: 'clipboard' | 'file')`（main）：clipboard.readImage()（空→reason 'empty-clipboard'）或 showOpenDialog（取消→'cancelled'）→ 写临时 png（userData/screenshots/import-*.png）→ 走与截图流水线相同的视觉分析与敏感熔断（敏感→'sensitive'，不保存任何内容）→ 成功则建 ManualRecord（source 'image'，content=AI 摘要，category=AI 判定）→ **无论成败立即删除临时图**。返回 ImageImportResult。
+
+### 17.D 数据导出 / 导入（src/main/dataTransfer.ts）
+
+- `exportAll()`：showSaveDialog（默认名 `gleam-daily-backup-YYYYMMDD.json`）→ 写 JSON：`{ schemaVersion: 1, appVersion, exportedAt, settings, data: { sessions, screenshots, notes, gitCommits, reports, manualRecords, meta } }`。settings 为**脱敏视图**（Settings 类型，不含加密密钥）；screenshots 去掉 path 字段（导出里无意义）。取消→ok:false 且 message=''。
+- `importAll()`：showOpenDialog → 解析校验（schemaVersion===1 且 data 各键为数组/对象，不合法→ok:false 带原因）→ 事务内 clearAllData + 逐表插入（保留原 id 无必要，重新自增即可；meta 全量覆盖）→ 返回各表条数。**不导入 settings**（避免覆盖本机 provider/密钥配置；文案里说明）。渲染层负责确认弹窗与完成后刷新。
+- IPC：`dataMgmt.exportAll/importAll`。
+
+### 17.E 定时日报（src/main/scheduler.ts）
+
+- settings.scheduledReport：`{ enabled: false, time: '18:00', template: 'standard', extraInstructions: '' }`。
+- 30s tick：enabled && 本地时间 ≥ 今天 time && meta.scheduler.lastRunDate ≠ 今天 → 先写 lastRunDate（防重入）→ 若今天已存在 daily 报告则记 skipped；否则调用现有 generator 生成（模板/附加指令取设置）。结果写 meta.scheduler.lastResult 并发系统 Notification（成功：「今日日报已生成」点击→显示主窗并跳 #/reports；失败：「日报生成失败」+ 摘要）。
+- scheduler 同时承担 17.A 的记忆自动刷新检查（同一 tick，先日报后记忆，互不阻塞主线程——全部 async）。
+- IPC：`scheduledReport.getStatus`（组装 ScheduledReportStatus，nextRunAt：enabled 时下一次触发的 epoch ms，否则 null）、`scheduledReport.runNow`（忽略 lastRunDate 与 time 立即执行一次完整流程，含通知；供设置页「立即试跑」与 E2E）。
+
+### 17.F 识别当前屏幕
+
+- IPC `capture.analyzeNow`：无视间隔定时器立即执行一次「截图→分析→删图」完整流水线（复用 screenshots.ts；同样受排除应用与敏感熔断约束；不要求 screenshots.enabled 开启，但要求屏幕录制权限，无权限→ok:false reason 引导）。成功返回分析行。
+- 入口：今日页头部按钮「识别当前屏幕」+ 托盘菜单同名项（托盘触发后发系统通知展示一句话结果）。
+
+### 17.G MCP Server（src/main/mcp/，自包含）
+
+定位：把本机工作数据以标准 MCP 只读工具暴露给 Claude Code / Codex 等本地 Agent。**默认关闭**；仅绑定 127.0.0.1；这是隐私红线的一部分。
+
+- 依赖：`@modelcontextprotocol/sdk`（Streamable HTTP transport，无状态模式）。HTTP 端点路径 `/mcp`，端口 settings.mcp.port（默认 41414）。
+- settings.mcp：`{ enabled: false, port: 41414 }`。设置变更时热启停（start/stop 幂等；端口占用→状态里报错误，不崩溃）。
+- 工具（全部只读，输入输出 JSON）：
+  1. `get_day_overview(date?)` —— 某日（默认今天）DayStats 摘要 + 截图摘要条数 + 速记数 + 提交数。
+  2. `list_activities(date, includeDetails?)` —— 该日 sessions（聚合到分钟粒度的时间线）+ 截图摘要 + 手动记录 + 速记。
+  3. `search_activities(query, days?)` —— 近 days（默认 30）天在 session 标题/截图摘要/速记/手动记录/提交信息里 LIKE 检索，返回带日期的命中列表（上限 50 条）。
+  4. `list_reports(type?, limit?)` / `get_report(id)` —— 报告元数据列表 / 单篇全文。
+  5. `get_stats(days?)` —— 复用 17.B：top apps + 分类时长 + 活跃概览。
+- 请求日志：内存环形数组 200 条 `McpLogEntry{ts, tool, argsJson, ok, durationMs}`，IPC `mcp.getLogs` 供设置页展示；`mcp.getStatus` 返回 `{running, port, url, error}`。
+- 模块出口：`initMcp()`（读设置决定是否启动 + 订阅设置变化）与 `registerMcpIpc()`；主进程接线各一行（由集成者完成）。
+- 设置页提供一键复制接入命令：`claude mcp add --transport http gleam-daily http://127.0.0.1:{port}/mcp`。
+
+### 17.H 验收清单（v1.3）
+
+1. 设置页「立即更新记忆」：真实 provider 生成记忆并可编辑保存；生成日报的 prompt 里含记忆块（日志或 DB 验证）；截图分析同理。
+2. 统计页：seed + 真实数据下四个区块渲染正确；空库不崩溃、给空态；深浅色都符合 DESIGN。
+3. 今日页：补录一条手动记录出现在时间线正确位置；编辑其分类/内容生效；删除消失；自动 session 改分类/删除生效；传图识别（剪贴板与文件两路）真实产出一条 image 手动记录。
+4. 导出 JSON 后清库再导入，各页数据完整回归；导入不合法文件给出明确错误。
+5. 定时日报「立即试跑」端到端成功：生成真实日报 + 系统通知 + 状态区显示最近一次结果；到点触发逻辑用改时间的方式验证。
+6. 「识别当前屏幕」按钮与托盘项真实产出一条分析行（图被删除）。
+7. MCP：开启后用真实 MCP 客户端（Claude Code CLI 或脚本）调用 ≥3 个工具返回正确数据；设置页请求日志出现对应条目；关闭后端口即时释放。
+8. 全部新增 Settings 字段经 deepMerge 从旧 settings.json 平滑迁移。
+9. typecheck 双 tsconfig 通过；`npm run build:mac` 打包后上述功能在打包版可用（抽查 2/5/7）。

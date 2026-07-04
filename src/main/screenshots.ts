@@ -3,9 +3,10 @@
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Category } from '../shared/types';
+import type { AnalyzeNowResult, Category, ScreenshotAnalysis } from '../shared/types';
 import { getStaleScreenshots, insertScreenshot, markScreenshotDeleted, updateScreenshotAnalysis } from './db';
 import { getProvider, humanizeProviderError } from './ai';
+import { buildVisionMemoryInjection } from './memory';
 import { resolveScreenshotsDir } from './paths';
 import { checkScreenRecordingPermission } from './permissions';
 import { getSettings } from './settings';
@@ -117,7 +118,7 @@ async function analyzeWithRetry(item: QueueItem): Promise<void> {
   // 失败的图片保留，等 24h 清理任务兜底删除，不在这里立即删。
 }
 
-interface ParsedVisionResult {
+export interface ParsedVisionResult {
   summary: string;
   category: Category | null;
   sensitive: boolean;
@@ -143,24 +144,97 @@ function parseVisionResponse(raw: string): ParsedVisionResult {
   return { summary, category, sensitive };
 }
 
-async function analyzeOnce(item: QueueItem): Promise<void> {
-  const settings = getSettings();
-  const provider = getProvider(settings);
-  const raw = await provider.analyzeImage(item.filePath, VISION_PROMPT);
-  const result = parseVisionResponse(raw);
+/**
+ * 纯视觉分析：记忆注入块 + VISION_PROMPT → provider.analyzeImage → 解析。不落库、不动熔断计数、不删图。
+ * 供截图流水线（performAnalysis）与传图识别（imageImport.ts）复用。
+ */
+export async function analyzeImagePath(filePath: string): Promise<ParsedVisionResult> {
+  const provider = getProvider(getSettings());
+  const raw = await provider.analyzeImage(filePath, buildVisionMemoryInjection() + VISION_PROMPT);
+  return parseVisionResponse(raw);
+}
 
+/**
+ * 完整分析一张已入库截图：分析 → 更新分析结果（含敏感熔断计数）→ 删图。返回最终落库状态。
+ * 分析失败会向上抛出（由调用方决定重试/标记 failed）。
+ */
+async function performAnalysis(id: number, filePath: string): Promise<ParsedVisionResult & { status: ScreenshotAnalysis['status'] }> {
+  const result = await analyzeImagePath(filePath);
   if (result.sensitive) {
     consecutiveSensitive += 1;
     if (consecutiveSensitive >= SENSITIVE_BREAKER_THRESHOLD) {
       sensitiveBreakerUntil = Date.now() + SENSITIVE_BREAKER_COOLDOWN_MS;
       console.warn(`[screenshots] 连续 ${consecutiveSensitive} 次检测到敏感内容，暂停截图 ${SENSITIVE_BREAKER_COOLDOWN_MS / 60_000} 分钟。`);
     }
-    updateScreenshotAnalysis(item.id, { status: 'skipped', summary: '', category: null });
-  } else {
-    consecutiveSensitive = 0;
-    updateScreenshotAnalysis(item.id, { status: 'analyzed', summary: result.summary, category: result.category });
+    updateScreenshotAnalysis(id, { status: 'skipped', summary: '', category: null });
+    await deleteFileIfNeeded(id, filePath);
+    return { ...result, status: 'skipped' };
   }
-  await deleteFileIfNeeded(item.id, item.filePath);
+  consecutiveSensitive = 0;
+  updateScreenshotAnalysis(id, { status: 'analyzed', summary: result.summary, category: result.category });
+  await deleteFileIfNeeded(id, filePath);
+  return { ...result, status: 'analyzed' };
+}
+
+async function analyzeOnce(item: QueueItem): Promise<void> {
+  await performAnalysis(item.id, item.filePath);
+}
+
+/** 当前前台应用是否命中排除名单（与 tracker 同规则；tracker 未导出该判断，此处轻量复刻）。 */
+function isCurrentAppExcluded(): boolean {
+  const app = getCurrentForegroundApp();
+  if (!app) return false;
+  const lower = app.toLowerCase();
+  return getSettings().tracking.excludedApps.some((e) => e.trim() !== '' && lower.includes(e.trim().toLowerCase()));
+}
+
+/**
+ * 识别当前屏幕（SPEC §17.F）：无视间隔定时器，立即走完整「截图→分析→删图」流水线。
+ * 不要求 screenshots.enabled 开启，但要求屏幕录制权限；同样受排除应用与敏感熔断约束。
+ */
+export async function analyzeNow(): Promise<AnalyzeNowResult> {
+  if (Date.now() < sensitiveBreakerUntil) {
+    return { ok: false, reason: '近期多次检测到敏感画面，已临时暂停截图分析，请稍后再试。' };
+  }
+  if (checkScreenRecordingPermission() !== 'granted') {
+    return { ok: false, reason: '尚未授予「屏幕录制」权限，请在「系统设置 › 隐私与安全性 › 屏幕录制」中开启后重试。' };
+  }
+  if (isCurrentAppExcluded()) {
+    return { ok: false, reason: '当前前台应用在排除名单中，已跳过截图。' };
+  }
+
+  const dir = resolveScreenshotsDir();
+  const ts = Date.now();
+  const filePath = path.join(dir, `${ts}.jpg`);
+
+  try {
+    await execFileAsync('screencapture', ['-x', '-m', '-t', 'jpg', filePath]);
+  } catch {
+    return { ok: false, reason: '截图失败，请确认已授予屏幕录制权限并重试。' };
+  }
+  if (!fs.existsSync(filePath)) {
+    return { ok: false, reason: '截图失败（未生成文件），请稍后重试。' };
+  }
+  try {
+    await execFileAsync('sips', ['-Z', '1400', filePath]);
+  } catch {
+    // 缩放失败不致命，继续用原图分析
+  }
+
+  const app = getCurrentForegroundApp() ?? '';
+  const row = insertScreenshot({ ts, app, path: filePath });
+  try {
+    const final = await performAnalysis(row.id, filePath);
+    if (final.sensitive) {
+      return { ok: false, reason: '画面包含敏感信息，已跳过分析且未保存内容。' };
+    }
+    const analysis: ScreenshotAnalysis = { id: row.id, ts, status: final.status, summary: final.summary, category: final.category, app };
+    return { ok: true, analysis };
+  } catch (err) {
+    updateScreenshotAnalysis(row.id, { status: 'failed', summary: '', category: null });
+    // 失败图与流水线一致：保留，交给 24h 清理任务兜底，避免重试期间误删。
+    return { ok: false, reason: `分析失败：${humanizeProviderError(err)}` };
+  }
 }
 
 async function deleteFileIfNeeded(id: number, filePath: string): Promise<void> {

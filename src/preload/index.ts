@@ -2,17 +2,32 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from '../shared/ipc-channels';
 import type {
+  AnalyzeNowResult,
+  Category,
   DeepPartial,
+  ExportResult,
   GitCommit,
+  HeatmapDay,
+  ImageImportResult,
+  ImportResult,
+  ManualRecord,
+  ManualRecordSource,
   MaterialPreview,
+  McpLogEntry,
+  McpStatus,
+  MemoryRefreshPreview,
+  MemoryState,
   Note,
   ProviderTestResult,
   Report,
   ReportGenOptions,
   ReportProgress,
+  ScheduledReportStatus,
   ScreenshotAnalysis,
   Session,
   Settings,
+  StatsOverview,
+  TopApp,
   TrackerStatus,
   DayStats,
 } from '../shared/types';
@@ -41,6 +56,47 @@ const gleamApi = {
     deleteNote: (id: number): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.data.deleteNote, id),
     collectCommits: (startTs: number, endTs: number): Promise<GitCommit[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.data.collectCommits, startTs, endTs),
+    addManualRecord: (data: { ts: number; category: Category; title: string; content: string; source: ManualRecordSource }): Promise<ManualRecord> =>
+      ipcRenderer.invoke(IPC_CHANNELS.data.addManualRecord, data),
+    listManualRecords: (startTs: number, endTs: number): Promise<ManualRecord[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.data.listManualRecords, startTs, endTs),
+    updateManualRecord: (id: number, patch: { ts?: number; category?: Category; title?: string; content?: string }): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.data.updateManualRecord, id, patch),
+    deleteManualRecord: (id: number): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.data.deleteManualRecord, id),
+    updateSessionCategory: (id: number, category: Category): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.data.updateSessionCategory, id, category),
+    deleteSession: (id: number): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.data.deleteSession, id),
+    importImage: (source: 'clipboard' | 'file'): Promise<ImageImportResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.data.importImage, source),
+  },
+  stats: {
+    getOverview: (): Promise<StatsOverview> => ipcRenderer.invoke(IPC_CHANNELS.stats.getOverview),
+    getHeatmap: (days: number): Promise<HeatmapDay[]> => ipcRenderer.invoke(IPC_CHANNELS.stats.getHeatmap, days),
+    getHourMatrix: (days: number): Promise<number[][]> => ipcRenderer.invoke(IPC_CHANNELS.stats.getHourMatrix, days),
+    getTopApps: (days: number): Promise<TopApp[]> => ipcRenderer.invoke(IPC_CHANNELS.stats.getTopApps, days),
+    getCategoryTotals: (days: number): Promise<Partial<Record<Category, number>>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.stats.getCategoryTotals, days),
+  },
+  memory: {
+    get: (): Promise<MemoryState> => ipcRenderer.invoke(IPC_CHANNELS.memory.get),
+    update: (content: string): Promise<MemoryState> => ipcRenderer.invoke(IPC_CHANNELS.memory.update, content),
+    refresh: (): Promise<MemoryState> => ipcRenderer.invoke(IPC_CHANNELS.memory.refresh),
+    refreshPreview: (): Promise<MemoryRefreshPreview> => ipcRenderer.invoke(IPC_CHANNELS.memory.refreshPreview),
+  },
+  dataMgmt: {
+    exportAll: (): Promise<ExportResult> => ipcRenderer.invoke(IPC_CHANNELS.dataMgmt.exportAll),
+    importAll: (): Promise<ImportResult> => ipcRenderer.invoke(IPC_CHANNELS.dataMgmt.importAll),
+  },
+  scheduledReport: {
+    getStatus: (): Promise<ScheduledReportStatus> => ipcRenderer.invoke(IPC_CHANNELS.scheduledReport.getStatus),
+    runNow: (): Promise<ScheduledReportStatus> => ipcRenderer.invoke(IPC_CHANNELS.scheduledReport.runNow),
+  },
+  capture: {
+    analyzeNow: (): Promise<AnalyzeNowResult> => ipcRenderer.invoke(IPC_CHANNELS.capture.analyzeNow),
+  },
+  mcp: {
+    getStatus: (): Promise<McpStatus> => ipcRenderer.invoke(IPC_CHANNELS.mcp.getStatus),
+    getLogs: (): Promise<McpLogEntry[]> => ipcRenderer.invoke(IPC_CHANNELS.mcp.getLogs),
   },
   reports: {
     preview: (opts: ReportGenOptions): Promise<MaterialPreview> => ipcRenderer.invoke(IPC_CHANNELS.reports.preview, opts),

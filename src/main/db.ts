@@ -2,7 +2,18 @@
 // 契约要求：db 路径解析必须能脱离 Electron app 对象独立工作（供 scripts/seed-demo.ts 等纯 Node 场景使用），
 // 具体解析逻辑见 ./paths.ts。
 import Database from 'better-sqlite3';
-import type { Category, GitCommit, Note, Report, ReportTemplate, ReportType, ScreenshotAnalysis, Session } from '../shared/types';
+import type {
+  Category,
+  GitCommit,
+  ManualRecord,
+  ManualRecordSource,
+  Note,
+  Report,
+  ReportTemplate,
+  ReportType,
+  ScreenshotAnalysis,
+  Session,
+} from '../shared/types';
 import { resolveDbPath } from './paths';
 
 export interface ScreenshotRow extends ScreenshotAnalysis {
@@ -88,6 +99,24 @@ function migrate(instance: Database.Database): void {
       created_ts INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_reports_created_ts ON reports(created_ts);
+
+    -- v1.3：手动补录 / 传图识别（SPEC §17.0、§17.C）。source: 'manual' | 'image'。
+    CREATE TABLE IF NOT EXISTS manual_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ts INTEGER NOT NULL,
+      category TEXT NOT NULL,
+      title TEXT NOT NULL DEFAULT '',
+      content TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'manual',
+      created_ts INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_manual_records_ts ON manual_records(ts);
+
+    -- v1.3：通用 KV（记忆内容、调度器状态等，SPEC §17.0）。
+    CREATE TABLE IF NOT EXISTS meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
 }
 
@@ -140,6 +169,16 @@ export function getSessions(startTs: number, endTs: number): Session[] {
 export function getLastSession(): Session | null {
   const row = getDb().prepare<[], SessionRow>(`SELECT * FROM sessions ORDER BY start_ts DESC LIMIT 1`).get();
   return row ? rowToSession(row) : null;
+}
+
+/** v1.3：用户在时间线上手动修正某条自动 session 的分类（SPEC §17.C）。 */
+export function updateSessionCategory(id: number, category: Category): void {
+  getDb().prepare(`UPDATE sessions SET category = ? WHERE id = ?`).run(category, id);
+}
+
+/** v1.3：删除一条自动 session 聚合行（仅删该行，不影响截图/速记，SPEC §17.C）。 */
+export function deleteSession(id: number): void {
+  getDb().prepare(`DELETE FROM sessions WHERE id = ?`).run(id);
 }
 
 // ---------------------------------------------------------------------------
@@ -371,6 +410,107 @@ export function deleteReport(id: number): void {
 }
 
 // ---------------------------------------------------------------------------
+// manual_records（手动补录 / 传图识别，SPEC §17.C）
+// ---------------------------------------------------------------------------
+
+interface ManualRecordRow {
+  id: number;
+  ts: number;
+  category: string;
+  title: string;
+  content: string;
+  source: string;
+  created_ts: number;
+}
+
+function rowToManualRecord(row: ManualRecordRow): ManualRecord {
+  return {
+    id: row.id,
+    ts: row.ts,
+    category: row.category as Category,
+    title: row.title,
+    content: row.content,
+    source: row.source as ManualRecordSource,
+  };
+}
+
+export function insertManualRecord(data: {
+  ts: number;
+  category: Category;
+  title: string;
+  content: string;
+  source: ManualRecordSource;
+}): ManualRecord {
+  const createdTs = Date.now();
+  const info = getDb()
+    .prepare(
+      `INSERT INTO manual_records (ts, category, title, content, source, created_ts)
+       VALUES (@ts, @category, @title, @content, @source, @createdTs)`,
+    )
+    .run({ ...data, createdTs });
+  return {
+    id: Number(info.lastInsertRowid),
+    ts: data.ts,
+    category: data.category,
+    title: data.title,
+    content: data.content,
+    source: data.source,
+  };
+}
+
+/** 时间序（升序），便于与 session 块合并成时间线。 */
+export function listManualRecords(startTs: number, endTs: number): ManualRecord[] {
+  const rows = getDb()
+    .prepare<[number, number], ManualRecordRow>(`SELECT * FROM manual_records WHERE ts >= ? AND ts <= ? ORDER BY ts ASC`)
+    .all(startTs, endTs);
+  return rows.map(rowToManualRecord);
+}
+
+export function updateManualRecord(id: number, patch: { ts?: number; category?: Category; title?: string; content?: string }): void {
+  const fields: string[] = [];
+  const params: Record<string, unknown> = { id };
+  if (patch.ts !== undefined) {
+    fields.push('ts = @ts');
+    params.ts = patch.ts;
+  }
+  if (patch.category !== undefined) {
+    fields.push('category = @category');
+    params.category = patch.category;
+  }
+  if (patch.title !== undefined) {
+    fields.push('title = @title');
+    params.title = patch.title;
+  }
+  if (patch.content !== undefined) {
+    fields.push('content = @content');
+    params.content = patch.content;
+  }
+  if (fields.length === 0) return;
+  getDb()
+    .prepare(`UPDATE manual_records SET ${fields.join(', ')} WHERE id = @id`)
+    .run(params);
+}
+
+export function deleteManualRecord(id: number): void {
+  getDb().prepare(`DELETE FROM manual_records WHERE id = ?`).run(id);
+}
+
+// ---------------------------------------------------------------------------
+// meta（通用 KV：记忆内容、调度器状态等，SPEC §17.0）
+// ---------------------------------------------------------------------------
+
+export function getMeta(key: string): string | null {
+  const row = getDb().prepare<[string], { value: string }>(`SELECT value FROM meta WHERE key = ?`).get(key);
+  return row ? row.value : null;
+}
+
+export function setMeta(key: string, value: string): void {
+  getDb()
+    .prepare(`INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
+    .run(key, value);
+}
+
+// ---------------------------------------------------------------------------
 // 清除所有数据
 // ---------------------------------------------------------------------------
 
@@ -382,5 +522,7 @@ export function clearAllData(): void {
     DELETE FROM notes;
     DELETE FROM git_commits;
     DELETE FROM reports;
+    DELETE FROM manual_records;
+    DELETE FROM meta;
   `);
 }

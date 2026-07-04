@@ -41,6 +41,7 @@ export interface GeneratorProps {
 
 function formatPreviewText(p: MaterialPreview, type: ReportType): string {
   const parts = [`${p.sessionCount} 段活动`, `${p.commitCount} 次提交`, `${p.noteCount} 条速记`];
+  if (p.manualRecordCount > 0) parts.push(`手动补录 ${p.manualRecordCount} 条`);
   if (p.screenshotCount > 0) parts.push(`${p.screenshotCount} 次截图分析`);
   if (type !== 'daily' && p.dailyReportCount > 0) parts.push(`${p.dailyReportCount} 篇日报可复用`);
   return `素材：${parts.join(' · ')}`;

@@ -229,3 +229,145 @@
   color: var(--text-3);
   padding: 12px 0 8px;
 }
+
+/* --- v1.3：AI 记忆 --- */
+.gd-mem-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.gd-mem-stamp {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.gd-mem-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.gd-mem-editor {
+  margin-top: 12px;
+}
+
+.gd-mem-textarea {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.gd-mem-save {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+/* --- v1.3：定时日报状态 --- */
+.gd-sched-status {
+  font-size: 12.5px;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+/* --- v1.3：MCP --- */
+.gd-mcp-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gd-mcp-status__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-3);
+}
+
+.gd-mcp-status__dot[data-state='running'] {
+  background: var(--ok);
+}
+
+.gd-mcp-status__dot[data-state='error'] {
+  background: var(--danger);
+}
+
+.gd-mcp-status__text {
+  font-size: 12.5px;
+  color: var(--text-2);
+  word-break: break-all;
+}
+
+.gd-code-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+}
+
+.gd-code-block code {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.gd-mcp-logs-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 13.5px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.gd-mcp-logs-toggle:hover {
+  color: var(--accent);
+}
+
+.gd-mcp-logs-toggle svg {
+  transition: transform var(--transition-fast);
+}
+
+.gd-mcp-logs-hint {
+  font-size: 12px;
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+.gd-mcp-logs {
+  margin-top: 10px;
+}
+
+.gd-mcp-logs__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 2px;
+  font-size: 12px;
+  color: var(--text-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.gd-mcp-logs__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 2px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  border-bottom: 1px solid var(--border);
+}

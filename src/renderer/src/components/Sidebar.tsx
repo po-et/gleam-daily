@@ -7,11 +7,33 @@ import { useInterval } from '../lib/hooks';
 import { IconLayers, IconPaper, IconSlider, IconSun } from './icons';
 import './Sidebar.css';
 
-export type PageKey = 'today' | 'reports' | 'materials' | 'settings';
+export type PageKey = 'today' | 'reports' | 'stats' | 'materials' | 'settings';
+
+/** 统计页导航图标：柱状图（DESIGN §9）。风格对齐 icons.tsx：stroke 1.5、currentColor、无填充。 */
+function IconBarChart({ size = 16 }: { size?: number }): JSX.Element {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3.5 20.5h17" />
+      <rect x="5.5" y="12" width="3.4" height="6.5" rx="1" />
+      <rect x="10.8" y="7.5" width="3.4" height="11" rx="1" />
+      <rect x="16.1" y="10" width="3.4" height="8.5" rx="1" />
+    </svg>
+  );
+}
 
 const NAV_ITEMS: { key: PageKey; label: string; Icon: (props: { size?: number }) => JSX.Element }[] = [
   { key: 'today', label: '今日', Icon: IconSun },
   { key: 'reports', label: '报告', Icon: IconPaper },
+  { key: 'stats', label: '统计', Icon: IconBarChart },
   { key: 'materials', label: '素材', Icon: IconLayers },
   { key: 'settings', label: '设置', Icon: IconSlider },
 ];

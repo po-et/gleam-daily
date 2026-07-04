@@ -4,29 +4,48 @@ import fs from 'node:fs';
 import { BrowserWindow, app as electronApp, dialog, ipcMain, shell } from 'electron';
 import { IPC_CHANNELS } from '../shared/ipc-channels';
 import type {
+  AnalyzeNowResult,
+  Category,
   DeepPartial,
+  ExportResult,
   GitCommit,
+  HeatmapDay,
+  ImageImportResult,
+  ImportResult,
+  ManualRecord,
+  ManualRecordSource,
   MaterialPreview,
+  MemoryRefreshPreview,
+  MemoryState,
   Note,
   ProviderTestResult,
   Report,
   ReportGenOptions,
+  ScheduledReportStatus,
   ScreenshotAnalysis,
   Session,
   Settings,
+  StatsOverview,
+  TopApp,
   TrackerStatus,
 } from '../shared/types';
 import { getProvider } from './ai';
 import { isClaudeCliAvailable } from './ai/claude-cli';
 import { isCodexCliAvailable } from './ai/codex-cli';
+import { exportAll, importAll } from './dataTransfer';
 import * as db from './db';
 import { computeDayStats } from './dayStats';
 import { collectCommits } from './git';
+import { importImage } from './imageImport';
+import { getMemory, refreshMemory, refreshPreview as refreshMemoryPreview, setMemory } from './memory';
+import { syncMcpFromSettings } from './mcp/server';
 import { resolveScreenshotsDir } from './paths';
 import { collectMaterial } from './reports/collect';
 import { generateReport } from './reports/generator';
-import { setScreenshotsEnabled } from './screenshots';
+import { getScheduledReportStatus, runScheduledReportNow } from './scheduler';
+import { analyzeNow, setScreenshotsEnabled } from './screenshots';
 import { getSettings, setSecret, setSettings } from './settings';
+import * as stats from './stats';
 import { broadcastStatus as broadcastTrackerStatus, getTrackerStatus, resetCurrentSession, setTrackingEnabled } from './tracker';
 
 export function registerIpcHandlers(): void {
@@ -79,6 +98,95 @@ export function registerIpcHandlers(): void {
     collectCommits(startTs, endTs),
   );
 
+  // v1.3 手动补录 + 自动 session 编辑 + 传图识别（SPEC §17.C）
+  ipcMain.handle(
+    IPC_CHANNELS.data.addManualRecord,
+    async (_event, data: { ts: number; category: Category; title: string; content: string; source: ManualRecordSource }): Promise<ManualRecord> =>
+      db.insertManualRecord(data),
+  );
+
+  ipcMain.handle(IPC_CHANNELS.data.listManualRecords, async (_event, startTs: number, endTs: number): Promise<ManualRecord[]> =>
+    db.listManualRecords(startTs, endTs),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.data.updateManualRecord,
+    async (_event, id: number, patch: { ts?: number; category?: Category; title?: string; content?: string }): Promise<void> => {
+      db.updateManualRecord(id, patch);
+    },
+  );
+
+  ipcMain.handle(IPC_CHANNELS.data.deleteManualRecord, async (_event, id: number): Promise<void> => {
+    db.deleteManualRecord(id);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.data.updateSessionCategory, async (_event, id: number, category: Category): Promise<void> => {
+    db.updateSessionCategory(id, category);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.data.deleteSession, async (_event, id: number): Promise<void> => {
+    db.deleteSession(id);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.data.importImage, async (_event, source: 'clipboard' | 'file'): Promise<ImageImportResult> =>
+    importImage(source),
+  );
+
+  // ---------------------------------------------------------------------
+  // stats（v1.3，SPEC §17.B）
+  // ---------------------------------------------------------------------
+  ipcMain.handle(IPC_CHANNELS.stats.getOverview, async (): Promise<StatsOverview> => stats.getOverview());
+
+  ipcMain.handle(IPC_CHANNELS.stats.getHeatmap, async (_event, days: number): Promise<HeatmapDay[]> => stats.getHeatmap(days));
+
+  ipcMain.handle(IPC_CHANNELS.stats.getHourMatrix, async (_event, days: number): Promise<number[][]> => stats.getHourMatrix(days));
+
+  ipcMain.handle(IPC_CHANNELS.stats.getTopApps, async (_event, days: number): Promise<TopApp[]> => stats.getTopApps(days));
+
+  ipcMain.handle(
+    IPC_CHANNELS.stats.getCategoryTotals,
+    async (_event, days: number): Promise<Partial<Record<Category, number>>> => stats.getCategoryTotals(days),
+  );
+
+  // ---------------------------------------------------------------------
+  // memory（v1.3，SPEC §17.A）
+  // ---------------------------------------------------------------------
+  ipcMain.handle(IPC_CHANNELS.memory.get, async (): Promise<MemoryState> => getMemory());
+
+  ipcMain.handle(IPC_CHANNELS.memory.update, async (_event, content: string): Promise<MemoryState> => setMemory(content));
+
+  ipcMain.handle(IPC_CHANNELS.memory.refresh, async (): Promise<MemoryState> => refreshMemory());
+
+  ipcMain.handle(IPC_CHANNELS.memory.refreshPreview, async (): Promise<MemoryRefreshPreview> => refreshMemoryPreview());
+
+  // ---------------------------------------------------------------------
+  // dataMgmt（v1.3 导出/导入，SPEC §17.D）
+  // ---------------------------------------------------------------------
+  ipcMain.handle(IPC_CHANNELS.dataMgmt.exportAll, async (): Promise<ExportResult> => exportAll());
+
+  ipcMain.handle(IPC_CHANNELS.dataMgmt.importAll, async (): Promise<ImportResult> => {
+    const result = await importAll();
+    if (result.ok) {
+      // 全表已被替换：丢弃 tracker 内存里指向旧 id 的 currentSession，避免后续 updateSessionEnd 打到不存在的行。
+      resetCurrentSession();
+    }
+    return result;
+  });
+
+  // ---------------------------------------------------------------------
+  // scheduledReport（v1.3 定时日报，SPEC §17.E）
+  // ---------------------------------------------------------------------
+  ipcMain.handle(IPC_CHANNELS.scheduledReport.getStatus, async (): Promise<ScheduledReportStatus> => getScheduledReportStatus());
+
+  ipcMain.handle(IPC_CHANNELS.scheduledReport.runNow, async (): Promise<ScheduledReportStatus> => runScheduledReportNow());
+
+  // ---------------------------------------------------------------------
+  // capture（v1.3 识别当前屏幕，SPEC §17.F）
+  // ---------------------------------------------------------------------
+  ipcMain.handle(IPC_CHANNELS.capture.analyzeNow, async (): Promise<AnalyzeNowResult> => analyzeNow());
+
+  // 注意：mcp.* 两个通道由 M2 模块的集成者接线，此处刻意不注册。
+
   // ---------------------------------------------------------------------
   // reports
   // ---------------------------------------------------------------------
@@ -110,7 +218,12 @@ export function registerIpcHandlers(): void {
   // ---------------------------------------------------------------------
   ipcMain.handle(IPC_CHANNELS.settings.get, async (): Promise<Settings> => getSettings());
 
-  ipcMain.handle(IPC_CHANNELS.settings.set, async (_event, patch: DeepPartial<Settings>): Promise<Settings> => setSettings(patch));
+  ipcMain.handle(IPC_CHANNELS.settings.set, async (_event, patch: DeepPartial<Settings>): Promise<Settings> => {
+    const next = setSettings(patch);
+    // v1.3：settings.mcp 变更后热启停 MCP Server（幂等，内部只在状态变化时动作）。
+    syncMcpFromSettings();
+    return next;
+  });
 
   ipcMain.handle(IPC_CHANNELS.settings.setSecret, async (_event, which: 'anthropic' | 'openaiCompat', key: string): Promise<void> => {
     setSecret(which, key);

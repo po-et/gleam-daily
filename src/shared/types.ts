@@ -27,6 +27,23 @@ export interface Note {
   content: string;
 }
 
+// --- v1.3 手动记录（SPEC §17.C）---
+
+export type ManualRecordSource = 'manual' | 'image';
+
+export interface ManualRecord {
+  id: number;
+  ts: number; // 记录时间点（用户可改）
+  category: Category;
+  title: string; // 可为 ''
+  content: string;
+  source: ManualRecordSource;
+}
+
+export type ImageImportResult =
+  | { ok: true; record: ManualRecord }
+  | { ok: false; reason: 'empty-clipboard' | 'cancelled' | 'sensitive' | 'failed'; message: string };
+
 export interface GitCommit {
   id: number;
   repo: string;
@@ -67,6 +84,89 @@ export interface DayStats {
   focusBlocks: FocusBlock[]; // 同类连续 >= 25min
 }
 
+// --- v1.3 统计（SPEC §17.B）---
+
+export interface StatsOverview {
+  streakDays: number; // 截至今天（或昨天）连续有记录的天数
+  totalActiveDays: number;
+  avgDailyActiveMs30d: number; // 近 30 天有记录日的平均活跃时长
+  totalSessions: number;
+  totalScreenshots: number;
+  totalReports: number;
+}
+
+export interface HeatmapDay {
+  date: string; // 'YYYY-MM-DD'，连续无空洞
+  activeMs: number;
+}
+
+export interface TopApp {
+  app: string;
+  ms: number;
+  category: Category; // 该 app 时长最多的分类
+}
+
+// --- v1.3 记忆（SPEC §17.A）---
+
+export interface MemoryState {
+  content: string; // markdown，可为 ''
+  updatedTs: number; // 0 = 从未生成
+}
+
+export interface MemoryRefreshPreview {
+  sessionCount: number;
+  screenshotCount: number;
+  noteCount: number;
+  commitCount: number;
+  charCount: number; // 素材总字数（截断前）
+}
+
+// --- v1.3 导出导入（SPEC §17.D）---
+
+export interface ExportResult {
+  ok: boolean;
+  path?: string;
+  message?: string; // 取消时 ok:false 且 message ''
+}
+
+export interface ImportResult {
+  ok: boolean;
+  message: string;
+  counts?: Record<string, number>;
+}
+
+// --- v1.3 定时日报（SPEC §17.E）---
+
+export interface ScheduledReportStatus {
+  lastRunDate: string | null; // 'YYYY-MM-DD'
+  lastResult: 'success' | 'failed' | 'skipped' | null;
+  lastMessage: string;
+  nextRunAt: number | null; // enabled 时下一次触发 epoch ms
+}
+
+// --- v1.3 识别当前屏幕（SPEC §17.F）---
+
+export type AnalyzeNowResult =
+  | { ok: true; analysis: ScreenshotAnalysis }
+  | { ok: false; reason: string }; // 无权限/敏感熔断/分析失败等，直接给用户可读文案
+
+// --- v1.3 MCP（SPEC §17.G）---
+
+export interface McpStatus {
+  running: boolean;
+  port: number;
+  url: string; // running 时 http://127.0.0.1:{port}/mcp，否则 ''
+  error: string; // 端口占用等启动失败原因
+}
+
+export interface McpLogEntry {
+  ts: number;
+  tool: string;
+  argsJson: string;
+  ok: boolean;
+  durationMs: number;
+}
+
 export type PermissionState = 'granted' | 'denied' | 'unknown';
 
 export interface TrackerStatus {
@@ -104,6 +204,22 @@ export interface Settings {
     roleContext: string; // 用户角色描述，拼入 prompt
   };
   report: { defaultTemplate: ReportTemplate };
+  memory: {
+    enabled: boolean; // 默认 true
+    injectToVision: boolean; // 默认 true
+    injectToReports: boolean; // 默认 true
+    autoRefresh: 'off' | 'daily' | 'weekly'; // 默认 'weekly'
+  };
+  scheduledReport: {
+    enabled: boolean; // 默认 false
+    time: string; // 'HH:mm'，默认 '18:00'
+    template: ReportTemplate; // 默认 'standard'
+    extraInstructions: string;
+  };
+  mcp: {
+    enabled: boolean; // 默认 false（隐私红线：显式开启才对外暴露本机数据）
+    port: number; // 默认 41414，仅绑定 127.0.0.1
+  };
 }
 
 export interface ReportGenOptions {
@@ -132,6 +248,7 @@ export interface MaterialPreview {
   screenshotCount: number;
   commitCount: number;
   noteCount: number;
+  manualRecordCount: number; // v1.3：手动补录条数
   dailyReportCount: number; // weekly/monthly 时复用的日报数
 }
 

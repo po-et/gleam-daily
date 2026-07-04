@@ -20,10 +20,83 @@
   color: var(--text);
 }
 
+.gd-today__header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
 .gd-today__subline {
   font-size: 13px;
   color: var(--text-2);
   white-space: nowrap;
+}
+
+.gd-today__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 补录分体按钮 + 下拉菜单 */
+.gd-backfill {
+  position: relative;
+  display: inline-flex;
+  gap: 4px;
+}
+
+.gd-backfill__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 160px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  box-shadow: 0 6px 24px rgba(20, 18, 15, 0.16);
+  padding: 4px;
+  z-index: 50;
+}
+
+.gd-backfill__menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.gd-backfill__menu button:hover {
+  background: var(--bg-sunken);
+}
+
+/* 图片识别中的加载弹层 */
+.gd-loading-modal {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 32px rgba(20, 18, 15, 0.24);
+  width: 280px;
+  max-width: calc(100vw - 48px);
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  color: var(--accent);
+}
+
+.gd-loading-modal__text {
+  font-size: 13.5px;
+  color: var(--text-2);
 }
 
 .gd-today__cols {

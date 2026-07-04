@@ -13,7 +13,8 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { categorize } from '../src/shared/categories';
-import { addNote, getDb, insertScreenshot, insertSession, updateScreenshotAnalysis, upsertCommit } from '../src/main/db';
+import type { Category } from '../src/shared/types';
+import { addNote, getDb, insertManualRecord, insertScreenshot, insertSession, updateScreenshotAnalysis, upsertCommit } from '../src/main/db';
 import { resolveScreenshotsDir } from '../src/main/paths';
 
 function todayAt(hour: number, minute: number): number {
@@ -189,6 +190,97 @@ function seedScreenshots(): number {
   return SCREENSHOT_SCRIPT.length;
 }
 
+// ---------------------------------------------------------------------------
+// v1.3：近 60 天历史 sessions（供统计页验证）+ 今天 3 条手动补录（SPEC §17）
+// ---------------------------------------------------------------------------
+
+const HISTORY_DAYS = 60;
+
+/** 跨多 app / 分类的样本池 [app, title]。 */
+const HISTORY_SAMPLES: [string, string][] = [
+  ['Code', 'tracker.ts — gleam-daily'],
+  ['Code', 'reports/generator.ts — gleam-daily'],
+  ['Code', 'stats.ts — gleam-daily'],
+  ['Cursor', '重构 session 聚合 — gleam-daily'],
+  ['iTerm2', 'npm run typecheck'],
+  ['iTerm2', 'git rebase -i'],
+  ['Xcode', 'GleamDaily — 图标导出'],
+  ['腾讯会议', '周会 Weekly Sync'],
+  ['腾讯会议', '需求评审'],
+  ['飞书', '产品讨论群'],
+  ['微信', ''],
+  ['Slack', '#eng-frontend'],
+  ['Notion', '拾光日报 - 需求笔记'],
+  ['Obsidian', '技术方案草稿'],
+  ['语雀', '团队知识库 - 架构'],
+  ['Figma', '统计页视觉稿'],
+  ['Safari', 'GitHub - gleam-daily/pull/88'],
+  ['Safari', 'Stack Overflow - better-sqlite3 transaction'],
+  ['Safari', 'MDN - Intl.DateTimeFormat'],
+  ['Safari', '掘金 - Electron 定时任务实践'],
+  ['网易云音乐', ''],
+  ['bilibili', 'WWDC 回顾'],
+];
+
+function pickSample(): [string, string] {
+  const idx = Math.floor(Math.random() * HISTORY_SAMPLES.length);
+  return HISTORY_SAMPLES[idx] ?? ['Code', 'gleam-daily'];
+}
+
+/** 为过去 60 天（不含今天）各生成随机 2-6h、跨多 app/分类的 sessions。 */
+function seedHistory(): { days: number; sessions: number } {
+  const db = getDb();
+  const todayStart = todayAt(0, 0);
+  const historyStart = todayStart - HISTORY_DAYS * 24 * 60 * 60 * 1000;
+  // 幂等：先清掉历史窗口（今天之前）内的旧演示 session。
+  db.prepare(`DELETE FROM sessions WHERE start_ts >= ? AND start_ts < ?`).run(historyStart, todayStart);
+
+  let total = 0;
+  for (let d = 1; d <= HISTORY_DAYS; d++) {
+    const dayStart = todayStart - d * 24 * 60 * 60 * 1000;
+    const dayOfWeek = new Date(dayStart).getDay(); // 0=周日,6=周六
+    // 周末活跃度偏低，且约 40% 概率整天无记录（制造真实的热力图空洞与 streak 断点）。
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    if (isWeekend && Math.random() < 0.55) continue;
+    if (!isWeekend && Math.random() < 0.08) continue;
+
+    const targetMs = (isWeekend ? 1 + Math.random() * 2.5 : 2 + Math.random() * 4) * 60 * 60 * 1000;
+    const startHour = 9 + Math.floor(Math.random() * 2);
+    let cursor = new Date(dayStart);
+    cursor.setHours(startHour, Math.floor(Math.random() * 40), 0, 0);
+
+    let acc = 0;
+    while (acc < targetMs) {
+      const [app, title] = pickSample();
+      const durMs = (5 + Math.floor(Math.random() * 40)) * 60_000;
+      const startTs = cursor.getTime();
+      const endTs = startTs + durMs;
+      if (new Date(endTs).getHours() >= 22 && new Date(endTs).getDate() === new Date(startTs).getDate()) break;
+      insertSession({ startTs, endTs, app, title, category: categorize(app, title) });
+      total += 1;
+      acc += durMs;
+      cursor = new Date(endTs + Math.floor(Math.random() * 12) * 60_000); // 0-11 分钟间隙
+    }
+  }
+  return { days: HISTORY_DAYS, sessions: total };
+}
+
+const MANUAL_SCRIPT: { hour: number; minute: number; category: Category; title: string; content: string }[] = [
+  { hour: 11, minute: 30, category: 'meeting', title: '客户电话', content: '和客户对齐了 Q3 排期，重点是统计页与导出功能' },
+  { hour: 16, minute: 20, category: 'dev', title: '线下调试', content: '在同事机器上复现了 better-sqlite3 ABI 不匹配问题，记一笔' },
+  { hour: 18, minute: 45, category: 'docs', title: '', content: '补录：整理了 v1.3 验收清单，明天逐条过一遍' },
+];
+
+function seedManualRecords(): number {
+  const db = getDb();
+  const { start: dayStart, end: dayEnd } = dayRange();
+  db.prepare(`DELETE FROM manual_records WHERE ts >= ? AND ts < ?`).run(dayStart, dayEnd);
+  for (const m of MANUAL_SCRIPT) {
+    insertManualRecord({ ts: todayAt(m.hour, m.minute), category: m.category, title: m.title, content: m.content, source: 'manual' });
+  }
+  return MANUAL_SCRIPT.length;
+}
+
 function formatDuration(ms: number): string {
   const totalMinutes = Math.round(ms / 60_000);
   const h = Math.floor(totalMinutes / 60);
@@ -198,17 +290,21 @@ function formatDuration(ms: number): string {
 
 function main(): void {
   const sessions = seedSessions();
+  const history = seedHistory();
   const commitCount = seedCommits();
   const noteCount = seedNotes();
   const screenshotCount = seedScreenshots();
+  const manualCount = seedManualRecords();
 
   console.log('[seed-demo] 演示数据写入完成：');
   console.log(
-    `  sessions: ${sessions.count} 条，${new Date(sessions.startTs).toLocaleTimeString()} - ${new Date(sessions.endTs).toLocaleTimeString()}，累计 ${formatDuration(sessions.totalMs)}`,
+    `  sessions（今天）: ${sessions.count} 条，${new Date(sessions.startTs).toLocaleTimeString()} - ${new Date(sessions.endTs).toLocaleTimeString()}，累计 ${formatDuration(sessions.totalMs)}`,
   );
+  console.log(`  sessions（历史 ${history.days} 天）: ${history.sessions} 条`);
   console.log(`  git commits: ${commitCount} 条（gleam-daily / gleam-daily-docs 两个仓库）`);
   console.log(`  notes: ${noteCount} 条`);
   console.log(`  screenshots: ${screenshotCount} 条（analyzed/skipped 混合）`);
+  console.log(`  manual records（今天）: ${manualCount} 条`);
 }
 
 main();

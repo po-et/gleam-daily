@@ -21,6 +21,10 @@ interface PersistedSettings {
     roleContext: string;
   };
   report: Settings['report'];
+  // v1.3 新增三段（无密钥，形状与 Settings 完全一致，SPEC §17.A/§17.E/§17.G）。
+  memory: Settings['memory'];
+  scheduledReport: Settings['scheduledReport'];
+  mcp: Settings['mcp'];
 }
 
 const DEFAULT_TEMPLATE: ReportTemplate = 'standard';
@@ -54,6 +58,22 @@ function defaultPersistedSettings(): PersistedSettings {
       roleContext: '',
     },
     report: { defaultTemplate: DEFAULT_TEMPLATE },
+    memory: {
+      enabled: true,
+      injectToVision: true,
+      injectToReports: true,
+      autoRefresh: 'weekly',
+    },
+    scheduledReport: {
+      enabled: false,
+      time: '18:00',
+      template: DEFAULT_TEMPLATE,
+      extraInstructions: '',
+    },
+    mcp: {
+      enabled: false,
+      port: 41414,
+    },
   };
 }
 
@@ -189,6 +209,9 @@ function toPublicSettings(p: PersistedSettings): Settings {
       roleContext: p.ai.roleContext,
     },
     report: { ...p.report },
+    memory: { ...p.memory },
+    scheduledReport: { ...p.scheduledReport },
+    mcp: { ...p.mcp },
   };
 }
 
@@ -222,6 +245,9 @@ export function setSettings(patch: DeepPartial<Settings>): Settings {
       roleContext: patch.ai?.roleContext ?? current.ai.roleContext,
     },
     report: deepMerge(current.report, patch.report),
+    memory: deepMerge(current.memory, patch.memory),
+    scheduledReport: deepMerge(current.scheduledReport, patch.scheduledReport),
+    mcp: deepMerge(current.mcp, patch.mcp),
   };
   savePersisted(merged);
   return toPublicSettings(merged);

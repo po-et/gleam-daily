@@ -1,7 +1,19 @@
 // 设置页（DESIGN §6）：记录 / 屏幕分析 / Git / AI 引擎 / 外观与权限 / 数据 六组卡片 + 页脚。
 // 所有变更即时持久化：开关/下拉/分段即时 settings.set；文本输入失焦保存。对空数据/桩返回值健壮。
 import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
-import type { AiProviderKind, DeepPartial, PermissionState, Settings, TrackerStatus } from '@shared/types';
+import type {
+  AiProviderKind,
+  DeepPartial,
+  McpLogEntry,
+  McpStatus,
+  MemoryRefreshPreview,
+  MemoryState,
+  PermissionState,
+  ReportTemplate,
+  ScheduledReportStatus,
+  Settings,
+  TrackerStatus,
+} from '@shared/types';
 import { api } from '../api';
 import Card from '../components/Card';
 import Button from '../components/Button';
@@ -10,8 +22,10 @@ import SegmentControl from '../components/SegmentControl';
 import Modal from '../components/Modal';
 import { FieldRow, Input, Select, TagInput, Textarea } from '../components/FormControls';
 import { useToast } from '../components/Toast';
-import { IconExternalLink, IconTrash } from '../components/icons';
+import { IconChevronDown, IconCopy, IconDownload, IconExternalLink, IconTrash } from '../components/icons';
 import { applyTheme } from '../lib/theme';
+import { formatClockTime } from '../lib/format';
+import { useInterval } from '../lib/hooks';
 import './Settings.css';
 
 const DEFAULT_SETTINGS: Settings = {
@@ -29,6 +43,9 @@ const DEFAULT_SETTINGS: Settings = {
     roleContext: '',
   },
   report: { defaultTemplate: 'standard' },
+  memory: { enabled: true, injectToVision: true, injectToReports: true, autoRefresh: 'weekly' },
+  scheduledReport: { enabled: false, time: '18:00', template: 'standard', extraInstructions: '' },
+  mcp: { enabled: false, port: 41414 },
 };
 
 const SAMPLE_OPTIONS = [
@@ -70,6 +87,37 @@ const PERMISSION_TEXT: Record<PermissionState, string> = {
   denied: '未授权',
   unknown: '未知',
 };
+
+const AUTO_REFRESH_OPTIONS: { value: Settings['memory']['autoRefresh']; label: string }[] = [
+  { value: 'off', label: '关闭' },
+  { value: 'daily', label: '每天' },
+  { value: 'weekly', label: '每周' },
+];
+
+const TEMPLATE_OPTIONS: { value: ReportTemplate; label: string }[] = [
+  { value: 'standard', label: '标准' },
+  { value: 'concise', label: '简洁' },
+  { value: 'technical', label: '技术' },
+  { value: 'okr', label: 'OKR' },
+];
+
+/** epoch ms -> "M月D日 HH:mm"，0 表示从未。 */
+function formatStamp(ts: number): string {
+  if (!ts) return '从未';
+  const d = new Date(ts);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${hh}:${mm}`;
+}
+
+function schedStatusLine(st: ScheduledReportStatus | null): string {
+  const next = st?.nextRunAt ? `　下次 ${formatStamp(st.nextRunAt)}` : '';
+  if (!st || st.lastResult === null) return `尚未运行${next}`;
+  const label = st.lastResult === 'success' ? '成功' : st.lastResult === 'failed' ? '失败' : '跳过';
+  const when = st.lastRunDate ? ` · ${st.lastRunDate}` : '';
+  const msg = st.lastMessage ? ` · ${st.lastMessage}` : '';
+  return `上次：${label}${when}${msg}${next}`;
+}
 
 // preload 契约里没有暴露数据目录相关方法；若主进程未来扩展了这些可选方法，运行时探测后使用，否则优雅降级。
 type AppExtra = { getDataDir?: () => Promise<string>; showDataDir?: () => Promise<void> };
@@ -153,6 +201,29 @@ export default function SettingsPage(): JSX.Element {
   const [clearOpen, setClearOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
 
+  // v1.3：AI 记忆
+  const [memory, setMemory] = useState<MemoryState>({ content: '', updatedTs: 0 });
+  const [memDraft, setMemDraft] = useState('');
+  const [memEditorOpen, setMemEditorOpen] = useState(false);
+  const [memPreview, setMemPreview] = useState<MemoryRefreshPreview | null>(null);
+  const [memConfirmOpen, setMemConfirmOpen] = useState(false);
+  const [memRefreshing, setMemRefreshing] = useState(false);
+  const [memSaving, setMemSaving] = useState(false);
+
+  // v1.3：定时日报
+  const [schedStatus, setSchedStatus] = useState<ScheduledReportStatus | null>(null);
+  const [schedRunning, setSchedRunning] = useState(false);
+
+  // v1.3：数据导出/导入
+  const [exporting, setExporting] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+
+  // v1.3：MCP
+  const [mcpStatus, setMcpStatus] = useState<McpStatus | null>(null);
+  const [mcpLogs, setMcpLogs] = useState<McpLogEntry[]>([]);
+  const [logsOpen, setLogsOpen] = useState(false);
+
   const appExtra = useMemo(() => api.app as unknown as AppExtra, []);
 
   const refresh = useCallback(async (): Promise<void> => {
@@ -177,6 +248,15 @@ export default function SettingsPage(): JSX.Element {
     void api.app.isClaudeCliAvailable().then(setCliAvailable).catch(() => setCliAvailable(false));
     void api.app.isCodexCliAvailable().then(setCodexAvailable).catch(() => setCodexAvailable(false));
     void api.app.getVersion().then(setVersion).catch(() => setVersion(''));
+    void api.memory
+      .get()
+      .then((m) => {
+        setMemory(m);
+        setMemDraft(m.content);
+      })
+      .catch(() => {});
+    void api.scheduledReport.getStatus().then(setSchedStatus).catch(() => {});
+    void api.mcp.getStatus().then(setMcpStatus).catch(() => {});
     if (appExtra.getDataDir) {
       void appExtra.getDataDir().then(setDataDir).catch(() => setDataDir(null));
     }
@@ -204,6 +284,12 @@ export default function SettingsPage(): JSX.Element {
     },
     [persist],
   );
+
+  // MCP 运行状态每 5s 轮询；请求日志仅在展开时刷新。
+  useInterval(() => {
+    void api.mcp.getStatus().then(setMcpStatus).catch(() => {});
+    if (logsOpen) void api.mcp.getLogs().then(setMcpLogs).catch(() => {});
+  }, 5000);
 
   // ---- 记录 ----
   function toggleTracking(enabled: boolean): void {
@@ -325,7 +411,141 @@ export default function SettingsPage(): JSX.Element {
     }
   }
 
+  // ---- AI 记忆 ----
+  function toggleMemory(enabled: boolean): void {
+    commit({ ...settings, memory: { ...settings.memory, enabled } }, { memory: { enabled } });
+  }
+  function setMemoryVision(injectToVision: boolean): void {
+    commit({ ...settings, memory: { ...settings.memory, injectToVision } }, { memory: { injectToVision } });
+  }
+  function setMemoryReports(injectToReports: boolean): void {
+    commit({ ...settings, memory: { ...settings.memory, injectToReports } }, { memory: { injectToReports } });
+  }
+  function setAutoRefresh(autoRefresh: Settings['memory']['autoRefresh']): void {
+    commit({ ...settings, memory: { ...settings.memory, autoRefresh } }, { memory: { autoRefresh } });
+  }
+  async function openMemoryRefresh(): Promise<void> {
+    try {
+      const p = await api.memory.refreshPreview();
+      setMemPreview(p);
+      setMemConfirmOpen(true);
+    } catch {
+      showToast('无法读取素材规模', 'error');
+    }
+  }
+  async function confirmMemoryRefresh(): Promise<void> {
+    setMemRefreshing(true);
+    try {
+      const st = await api.memory.refresh();
+      setMemory(st);
+      setMemDraft(st.content);
+      setMemConfirmOpen(false);
+      showToast('记忆已更新', 'success');
+    } catch {
+      showToast('记忆整理失败，请检查 AI 引擎配置', 'error');
+    } finally {
+      setMemRefreshing(false);
+    }
+  }
+  async function saveMemory(): Promise<void> {
+    setMemSaving(true);
+    try {
+      const st = await api.memory.update(memDraft);
+      setMemory(st);
+      showToast('记忆已保存', 'success');
+    } catch {
+      showToast('保存失败，请重试', 'error');
+    } finally {
+      setMemSaving(false);
+    }
+  }
+
+  // ---- 定时日报 ----
+  async function updateSched(next: Settings['scheduledReport'], patch: DeepPartial<Settings>): Promise<void> {
+    setSettings((prev) => ({ ...prev, scheduledReport: next }));
+    try {
+      await api.settings.set(patch);
+      const st = await api.scheduledReport.getStatus();
+      setSchedStatus(st);
+    } catch {
+      /* ignore */
+    }
+  }
+  async function tryRunNow(): Promise<void> {
+    setSchedRunning(true);
+    try {
+      const st = await api.scheduledReport.runNow();
+      setSchedStatus(st);
+      if (st.lastResult === 'success') showToast('已生成今日日报', 'success');
+      else if (st.lastResult === 'skipped') showToast('今天已有日报，已跳过', 'default');
+      else showToast(st.lastMessage ? `试跑失败：${st.lastMessage}` : '试跑失败', 'error');
+    } catch {
+      showToast('试跑失败，请重试', 'error');
+    } finally {
+      setSchedRunning(false);
+    }
+  }
+
+  // ---- 数据导出 / 导入 ----
+  async function doExport(): Promise<void> {
+    setExporting(true);
+    try {
+      const r = await api.dataMgmt.exportAll();
+      if (r.ok) showToast(r.path ? `已导出到 ${r.path}` : '已导出备份', 'success');
+      else if (r.message) showToast(r.message, 'error');
+    } catch {
+      showToast('导出失败，请重试', 'error');
+    } finally {
+      setExporting(false);
+    }
+  }
+  async function confirmImport(): Promise<void> {
+    setImporting(true);
+    try {
+      const r = await api.dataMgmt.importAll();
+      if (r.ok) {
+        setImportOpen(false);
+        showToast('导入完成，正在刷新…', 'success');
+        window.setTimeout(() => window.location.reload(), 700);
+      } else {
+        setImportOpen(false);
+        if (r.message) showToast(r.message, 'error');
+      }
+    } catch {
+      showToast('导入失败，请重试', 'error');
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  // ---- MCP ----
+  function toggleMcp(enabled: boolean): void {
+    commit({ ...settings, mcp: { ...settings.mcp, enabled } }, { mcp: { enabled } });
+    window.setTimeout(() => {
+      void api.mcp.getStatus().then(setMcpStatus).catch(() => {});
+    }, 300);
+  }
+  function copyMcpCommand(): void {
+    const cmd = `claude mcp add --transport http gleam-daily http://127.0.0.1:${settings.mcp.port}/mcp`;
+    void navigator.clipboard
+      .writeText(cmd)
+      .then(() => showToast('已复制接入命令', 'success'))
+      .catch(() => showToast('复制失败，请手动复制', 'error'));
+  }
+  function toggleLogs(): void {
+    const next = !logsOpen;
+    setLogsOpen(next);
+    if (next) void api.mcp.getLogs().then(setMcpLogs).catch(() => setMcpLogs([]));
+  }
+
   const ai = settings.ai;
+  const mcpState = mcpStatus?.running ? 'running' : mcpStatus?.error ? 'error' : 'stopped';
+  const mcpStatusText = mcpStatus?.running
+    ? `运行中 · ${mcpStatus.url}`
+    : mcpStatus?.error
+      ? mcpStatus.error
+      : '未启动';
+  const mcpCommand = `claude mcp add --transport http gleam-daily http://127.0.0.1:${settings.mcp.port}/mcp`;
 
   return (
     <div className="gd-settings">
@@ -593,6 +813,91 @@ export default function SettingsPage(): JSX.Element {
         </div>
       </Card>
 
+      {/* AI 记忆 */}
+      <Card title="AI 记忆">
+        <FieldRow label="启用个人记忆" desc="AI 从历史记录提炼你的项目名、技术栈、协作对象等工作画像，注入截图分析与日报，减少认错名词。">
+          <Switch checked={settings.memory.enabled} onChange={toggleMemory} ariaLabel="启用个人记忆" />
+        </FieldRow>
+        <FieldRow label="参与截图分析" desc="识别屏幕时优先使用记忆里的标准名称。">
+          <Switch checked={settings.memory.injectToVision} disabled={!settings.memory.enabled} onChange={setMemoryVision} ariaLabel="参与截图分析" />
+        </FieldRow>
+        <FieldRow label="参与报告生成" desc="撰写日报时优先使用记忆里的标准名称。">
+          <Switch checked={settings.memory.injectToReports} disabled={!settings.memory.enabled} onChange={setMemoryReports} ariaLabel="参与报告生成" />
+        </FieldRow>
+        <FieldRow label="自动整理" desc="按周期在后台静默刷新记忆。">
+          <SegmentControl options={AUTO_REFRESH_OPTIONS} value={settings.memory.autoRefresh} onChange={setAutoRefresh} />
+        </FieldRow>
+        <div className="gd-settings__block">
+          <div className="gd-mem-head">
+            <span className="gd-mem-stamp">上次整理：{formatStamp(memory.updatedTs)}</span>
+            <div className="gd-mem-actions">
+              <Button size="sm" variant="secondary" loading={memRefreshing} onClick={() => void openMemoryRefresh()}>
+                立即更新记忆
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setMemEditorOpen((o) => !o)}>
+                {memEditorOpen ? '收起' : '查看/编辑'}
+              </Button>
+            </div>
+          </div>
+          {memEditorOpen ? (
+            <div className="gd-mem-editor">
+              <Textarea
+                className="gd-mem-textarea"
+                rows={10}
+                value={memDraft}
+                placeholder="还没有记忆。点「立即更新记忆」让 AI 从近 30 天记录整理，或在此手写。"
+                onChange={(e) => setMemDraft(e.target.value)}
+                style={{ width: '100%' }}
+              />
+              <div className="gd-mem-save">
+                <Button size="sm" variant="primary" loading={memSaving} onClick={() => void saveMemory()}>
+                  保存记忆
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </Card>
+
+      {/* 定时日报 */}
+      <Card title="定时日报">
+        <FieldRow label="启用定时日报" desc="每天到点自动生成当日日报，并发送系统通知。">
+          <Switch checked={settings.scheduledReport.enabled} onChange={(v) => void updateSched({ ...settings.scheduledReport, enabled: v }, { scheduledReport: { enabled: v } })} ariaLabel="启用定时日报" />
+        </FieldRow>
+        <FieldRow label="生成时间" desc="每天到这个时间自动生成。">
+          <Input
+            type="time"
+            value={settings.scheduledReport.time}
+            onChange={(e) => void updateSched({ ...settings.scheduledReport, time: e.target.value }, { scheduledReport: { time: e.target.value } })}
+            style={{ width: 130 }}
+          />
+        </FieldRow>
+        <FieldRow label="模板" desc="定时生成使用的日报模板。">
+          <Select
+            value={settings.scheduledReport.template}
+            options={TEMPLATE_OPTIONS}
+            onChange={(v) => void updateSched({ ...settings.scheduledReport, template: v }, { scheduledReport: { template: v } })}
+          />
+        </FieldRow>
+        <div className="gd-settings__block">
+          <div className="gd-settings__block-label">附加要求</div>
+          <Textarea
+            rows={2}
+            value={settings.scheduledReport.extraInstructions}
+            placeholder="例如：突出 X 项目的进展"
+            onChange={(e) => setSettings((prev) => ({ ...prev, scheduledReport: { ...prev.scheduledReport, extraInstructions: e.target.value } }))}
+            onBlur={() => persist({ scheduledReport: { extraInstructions: settings.scheduledReport.extraInstructions } })}
+            style={{ width: '100%' }}
+          />
+        </div>
+        <div className="gd-settings__test-row">
+          <Button variant="secondary" size="sm" loading={schedRunning} onClick={() => void tryRunNow()}>
+            立即试跑
+          </Button>
+          <span className="gd-sched-status">{schedStatusLine(schedStatus)}</span>
+        </div>
+      </Card>
+
       {/* 5. 外观与权限 */}
       <Card title="外观与权限">
         <FieldRow label="主题" desc="跟随系统，或手动固定深浅色。">
@@ -633,11 +938,88 @@ export default function SettingsPage(): JSX.Element {
             在 Finder 中显示
           </Button>
         </FieldRow>
+        <FieldRow label="导出全部数据" desc="导出为 JSON 备份（含记录与报告，不含 AI 密钥等设置）。">
+          <Button variant="secondary" size="sm" loading={exporting} onClick={() => void doExport()}>
+            <IconDownload size={13} />
+            导出
+          </Button>
+        </FieldRow>
+        <FieldRow label="导入数据" desc="从 JSON 备份恢复，将覆盖现有记录（不覆盖本机设置）。">
+          <Button variant="secondary" size="sm" onClick={() => setImportOpen(true)}>
+            导入
+          </Button>
+        </FieldRow>
         <FieldRow label="清除所有数据" desc="删除全部记录、报告与截图缓存，且不可恢复。" dangerDesc>
           <Button variant="danger" size="sm" onClick={() => setClearOpen(true)}>
             清除所有数据
           </Button>
         </FieldRow>
+      </Card>
+
+      {/* Agent 接入（MCP） */}
+      <Card title="Agent 接入（MCP）">
+        <FieldRow label="启用 MCP 接入" desc="把本机工作数据以只读 MCP 工具暴露给本地 Agent（Claude Code / Codex）。仅监听 127.0.0.1，默认关闭。">
+          <Switch checked={settings.mcp.enabled} onChange={toggleMcp} ariaLabel="启用 MCP 接入" />
+        </FieldRow>
+        <FieldRow label="端口" desc="MCP HTTP 服务监听端口。">
+          <Input
+            type="number"
+            value={String(settings.mcp.port)}
+            onChange={(e) => setSettings((prev) => ({ ...prev, mcp: { ...prev.mcp, port: Number(e.target.value) || 0 } }))}
+            onBlur={() => persist({ mcp: { port: settings.mcp.port } })}
+            style={{ width: 120 }}
+          />
+        </FieldRow>
+        <div className="gd-settings__block">
+          <div className="gd-settings__block-label">运行状态</div>
+          <div className="gd-mcp-status">
+            <span className="gd-mcp-status__dot" data-state={mcpState} />
+            <span className="gd-mcp-status__text">{mcpStatusText}</span>
+          </div>
+        </div>
+        <div className="gd-settings__block">
+          <div className="gd-settings__block-label">接入命令</div>
+          <div className="gd-code-block">
+            <code className="gd-mono">{mcpCommand}</code>
+            <Button variant="ghost" size="sm" iconOnly aria-label="复制接入命令" onClick={copyMcpCommand}>
+              <IconCopy size={13} />
+            </Button>
+          </div>
+          <div className="gd-settings__empty-hint">在终端执行即可把拾光日报接入 Claude Code。</div>
+        </div>
+        <div className="gd-settings__block">
+          <button type="button" className="gd-mcp-logs-toggle gd-no-drag" onClick={toggleLogs}>
+            <IconChevronDown size={14} style={{ transform: logsOpen ? 'rotate(180deg)' : undefined }} />
+            请求日志
+            <span className="gd-mcp-logs-hint">（最近 50 条）</span>
+          </button>
+          {logsOpen ? (
+            mcpLogs.length === 0 ? (
+              <div className="gd-settings__empty-hint">暂无请求</div>
+            ) : (
+              <div className="gd-mcp-logs">
+                <div className="gd-mcp-logs__head">
+                  <span style={{ width: 60 }}>时间</span>
+                  <span style={{ flex: 1 }}>工具</span>
+                  <span style={{ width: 64, textAlign: 'right' }}>耗时</span>
+                  <span style={{ width: 44, textAlign: 'right' }}>结果</span>
+                </div>
+                {mcpLogs.slice(0, 50).map((log, i) => (
+                  <div className="gd-mcp-logs__row" key={`${log.ts}-${i}`}>
+                    <span className="gd-mono" style={{ width: 60 }}>
+                      {formatClockTime(log.ts)}
+                    </span>
+                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.tool}</span>
+                    <span className="gd-mono" style={{ width: 64, textAlign: 'right' }}>
+                      {log.durationMs}ms
+                    </span>
+                    <span style={{ width: 44, textAlign: 'right', color: log.ok ? 'var(--ok)' : 'var(--danger)' }}>{log.ok ? '成功' : '失败'}</span>
+                  </div>
+                ))}
+              </div>
+            )
+          ) : null}
+        </div>
       </Card>
 
       <div className="gd-settings__footer">
@@ -653,6 +1035,31 @@ export default function SettingsPage(): JSX.Element {
         confirmLoading={clearing}
         onConfirm={() => void confirmClear()}
         onCancel={() => setClearOpen(false)}
+      />
+
+      <Modal
+        open={memConfirmOpen}
+        title="更新个人记忆？"
+        body={
+          memPreview
+            ? `将读取近 30 天素材（${memPreview.sessionCount} 段活动 · ${memPreview.screenshotCount} 条截图摘要 · ${memPreview.noteCount} 条速记 · ${memPreview.commitCount} 次提交，约 ${memPreview.charCount} 字），交给当前 AI 引擎整理成个人工作画像，并覆盖现有记忆。`
+            : '将读取近 30 天素材整理成个人工作画像，并覆盖现有记忆。'
+        }
+        confirmLabel="开始整理"
+        confirmLoading={memRefreshing}
+        onConfirm={() => void confirmMemoryRefresh()}
+        onCancel={() => setMemConfirmOpen(false)}
+      />
+
+      <Modal
+        open={importOpen}
+        title="导入数据？"
+        body="导入会先清空当前所有记录、报告与截图分析，再写入备份数据。此操作不可撤销，且不会覆盖本机的 AI 与密钥设置。"
+        confirmLabel="导入并覆盖"
+        danger
+        confirmLoading={importing}
+        onConfirm={() => void confirmImport()}
+        onCancel={() => setImportOpen(false)}
       />
     </div>
   );

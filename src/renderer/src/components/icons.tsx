@@ -135,6 +135,24 @@ export function IconDownload({ size = 16, ...rest }: IconProps): JSX.Element {
   );
 }
 
+export function IconPencil({ size = 16, ...rest }: IconProps): JSX.Element {
+  return (
+    <svg {...base(size)} {...rest}>
+      <path d="M4 20h4L18.4 9.6a1.9 1.9 0 0 0-2.7-2.7L5.3 17.3z" />
+      <path d="M13.8 6.8l3.4 3.4" />
+    </svg>
+  );
+}
+
+export function IconCamera({ size = 16, ...rest }: IconProps): JSX.Element {
+  return (
+    <svg {...base(size)} {...rest}>
+      <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7H8l1.3-2.2h5.4L16 7h2.5A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z" />
+      <circle cx="12" cy="12.8" r="3.2" />
+    </svg>
+  );
+}
+
 export function IconExternalLink({ size = 16, ...rest }: IconProps): JSX.Element {
   return (
     <svg {...base(size)} {...rest}>

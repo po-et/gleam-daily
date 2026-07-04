@@ -33,6 +33,8 @@ bash scripts/make-icons.sh   # 用 Swift + CoreGraphics 重新生成应用图标
 - `GLEAM_REMOTE_DEBUG=9333 npm run dev` 开启 CDP 远程调试端口，可用任意 CDP 客户端
   驱动页面、截图、直调 `window.gleam.*` 做端到端验证。
 - 数据库在 `~/Library/Application Support/gleam-daily/gleam.db`（WAL），可直接用 `sqlite3` 查看。
+- `GLEAM_USER_DATA=/path/to/dir` 覆盖 userData 根目录（最高优先级，DB / settings.json / 截图目录全部改写到该目录）。
+  用于 E2E / 自动化测试跑在独立数据目录，避免污染真实用户数据；解析逻辑见 `src/main/paths.ts` 的 `resolveUserDataDir`。
 - 脚本需要访问数据库时**不能用系统 Node**（better-sqlite3 的 ABI 是 Electron 的），要用：
   `ELECTRON_RUN_AS_NODE=1 npx electron ./node_modules/tsx/dist/cli.mjs <script.ts>`。
 

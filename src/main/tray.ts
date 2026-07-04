@@ -1,9 +1,10 @@
 // 菜单栏托盘。见 docs/SPEC.md §12。
 import { join } from 'node:path';
-import { Menu, Tray, app, nativeImage } from 'electron';
+import { Menu, Notification, Tray, app, nativeImage } from 'electron';
 import { getSessions } from './db';
 import { computeDayStats } from './dayStats';
 import { generateReport } from './reports/generator';
+import { analyzeNow } from './screenshots';
 import { getSettings, setSettings } from './settings';
 import { setTrackingEnabled } from './tracker';
 import { createQuickNoteWindow, getMainWindow, navigateMainWindow, setQuitting, showMainWindow } from './windows';
@@ -100,6 +101,17 @@ function openMainWindowAndGenerateTodayReport(): void {
   void generateReport({ type: 'daily', date: todayDateStr(), template: settings.report.defaultTemplate });
 }
 
+/** 托盘「识别当前屏幕」：走完整截图→分析→删图流水线，完成后发系统通知展示一句话摘要（SPEC §17.F、DESIGN §12）。 */
+async function captureCurrentScreenAndNotify(): Promise<void> {
+  const result = await analyzeNow();
+  if (!Notification.isSupported()) return;
+  if (result.ok) {
+    new Notification({ title: '已识别当前屏幕', body: result.analysis.summary || '（未识别到有效内容）' }).show();
+  } else {
+    new Notification({ title: '识别当前屏幕失败', body: result.reason }).show();
+  }
+}
+
 function buildMenu(): Menu {
   const settings = getSettings();
   return Menu.buildFromTemplate([
@@ -121,6 +133,12 @@ function buildMenu(): Menu {
     {
       label: '生成今日日报',
       click: () => openMainWindowAndGenerateTodayReport(),
+    },
+    {
+      label: '识别当前屏幕',
+      click: () => {
+        void captureCurrentScreenAndNotify();
+      },
     },
     { type: 'separator' },
     { label: '打开拾光日报', click: () => showMainWindow() },

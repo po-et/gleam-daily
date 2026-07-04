@@ -1,6 +1,6 @@
 // 素材页（DESIGN §5）：日期导航 + 四 tab（活动/屏幕分析/提交/速记）。
 import { useEffect, useState, type JSX } from 'react';
-import type { GitCommit, ScreenshotAnalysis, Session, Settings } from '@shared/types';
+import type { GitCommit, ManualRecord, ScreenshotAnalysis, Session, Settings } from '@shared/types';
 import { api } from '../api';
 import { dayRangeMs, formatDateHeading, shiftDateString, todayDateString } from '../lib/format';
 import Button from '../components/Button';
@@ -26,6 +26,7 @@ export default function Materials(): JSX.Element {
   const [date, setDate] = useState(todayDateString());
   const [tab, setTab] = useState<MaterialsTab>('activity');
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [manualRecords, setManualRecords] = useState<ManualRecord[]>([]);
   const [analyses, setAnalyses] = useState<ScreenshotAnalysis[]>([]);
   const [commits, setCommits] = useState<GitCommit[]>([]);
   const [commitsLoading, setCommitsLoading] = useState(false);
@@ -56,6 +57,10 @@ export default function Materials(): JSX.Element {
         .getSessions(startTs, endTs)
         .then((list) => !disposed && setSessions(list))
         .catch(() => !disposed && setSessions([]));
+      void api.data
+        .listManualRecords(startTs, endTs)
+        .then((list) => !disposed && setManualRecords(list))
+        .catch(() => !disposed && setManualRecords([]));
     } else if (tab === 'screenshots') {
       void api.data
         .getScreenshotAnalyses(startTs, endTs)
@@ -86,7 +91,7 @@ export default function Materials(): JSX.Element {
         <SegmentControl options={TAB_OPTIONS} value={tab} onChange={setTab} />
       </div>
 
-      {tab === 'activity' ? <ActivityTab sessions={sessions} /> : null}
+      {tab === 'activity' ? <ActivityTab sessions={sessions} manualRecords={manualRecords} /> : null}
       {tab === 'screenshots' ? (
         <ScreenshotsTab analyses={analyses} screenshotsEnabled={settings?.screenshots.enabled ?? true} />
       ) : null}

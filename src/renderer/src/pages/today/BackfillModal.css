@@ -1,0 +1,76 @@
+.gd-backfill-modal {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 32px rgba(20, 18, 15, 0.24);
+  width: 440px;
+  max-width: calc(100vw - 48px);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.gd-backfill-modal__title {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+.gd-backfill-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.gd-backfill-modal__label {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.gd-backfill-modal__time {
+  display: flex;
+  gap: 8px;
+}
+
+.gd-backfill-modal__cats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.gd-backfill-modal__cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: 7px 8px;
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.gd-backfill-modal__cat:hover {
+  border-color: var(--border-strong);
+}
+
+.gd-backfill-modal__cat[data-active='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.gd-backfill-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}

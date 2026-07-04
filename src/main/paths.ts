@@ -24,8 +24,17 @@ function tryGetElectronApp(): { getPath: (name: 'userData') => string } | null {
   }
 }
 
-/** userData 根目录。main 进程内 = app.getPath('userData')；否则回退到 mac 默认规则。 */
+/**
+ * userData 根目录。优先级：
+ *   1) 环境变量 GLEAM_USER_DATA（最高优先级，供 E2E / 自动化用独立数据目录，避免污染真实用户数据）；
+ *   2) main 进程内 app.getPath('userData')；
+ *   3) 非 Electron 环境回退到 mac 默认规则 ~/Library/Application Support/<app name>。
+ */
 export function resolveUserDataDir(): string {
+  const override = process.env.GLEAM_USER_DATA;
+  if (override && override.trim()) {
+    return override.trim();
+  }
   const app = tryGetElectronApp();
   if (app) {
     try {
