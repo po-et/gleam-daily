@@ -1,0 +1,45 @@
+# push v* 标签 → 双架构构建 → 自动创建 GitHub Release 并上传安装包
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build (arm64 + x64)
+        run: npx electron-vite build && npx electron-builder --mac --arm64 --x64 --publish never
+        # 接入 Apple 开发者签名与公证时，取消注释并在仓库 Secrets 里配置：
+        # env:
+        #   CSC_LINK: ${{ secrets.MAC_CERT_P12_BASE64 }}
+        #   CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+        #   APPLE_ID: ${{ secrets.APPLE_ID }}
+        #   APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        #   APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.dmg
+            release/*.zip
+          generate_release_notes: true

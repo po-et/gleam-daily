@@ -53,7 +53,8 @@
 
 从 [Releases](../../releases) 下载最新的 `.dmg`，拖进「应用程序」即可。
 
-> 目前仅支持 Apple Silicon（arm64）。本地构建见[参与开发](#-参与开发)。
+> Apple Silicon 下载 `arm64` 版，Intel Mac 下载 `x64` 版（x64 为 CI 交叉构建，欢迎反馈）。
+> 当前为 ad-hoc 签名：首次打开如被拦截，右键 → 打开即可。本地构建见[参与开发](#-参与开发)。
 
 ### 三步跑起来
 
@@ -127,7 +128,8 @@ npm run build:mac  # 打包 .dmg / .zip（arm64）
 
 ## 🗺 Roadmap
 
-- [ ] Intel Mac（x64）构建
+- [x] Intel Mac（x64）构建（v1.2.0 起随 Release 提供）
+- [x] CI 自动发布（push tag 触发）
 - [ ] 多显示器截图分析
 - [ ] 日历事件汇入（会议日程自动成为素材）
 - [ ] 报告定时自动生成 + 提醒
