@@ -1,0 +1,56 @@
+{
+  "name": "gleam-daily",
+  "productName": "拾光日报",
+  "version": "1.1.0",
+  "description": "macOS 本地日报助手：静默记录工作轨迹，一键生成日报/周报/月报。数据 100% 本地存储。Privacy-first local work journal & AI daily report assistant for macOS.",
+  "private": true,
+  "license": "MIT",
+  "author": "Gleam Daily Contributors",
+  "homepage": "https://github.com/<your-name>/gleam-daily#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/<your-name>/gleam-daily.git"
+  },
+  "keywords": [
+    "macos",
+    "electron",
+    "daily-report",
+    "time-tracking",
+    "ai",
+    "claude",
+    "codex",
+    "local-first",
+    "privacy"
+  ],
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "typecheck:node": "tsc -p tsconfig.node.json --noEmit",
+    "typecheck:web": "tsc -p tsconfig.web.json --noEmit",
+    "build:mac": "electron-vite build && electron-builder --mac --arm64",
+    "seed": "ELECTRON_RUN_AS_NODE=1 electron ./node_modules/tsx/dist/cli.mjs scripts/seed-demo.ts",
+    "postinstall": "electron-rebuild -f -w better-sqlite3"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
+    "better-sqlite3": "^12.4.1",
+    "marked": "^17.0.0"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.1",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.0",
+    "electron": "^38.4.0",
+    "electron-builder": "^26.0.20",
+    "electron-vite": "^4.0.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.11"
+  }
+}

@@ -1,0 +1,77 @@
+.gd-history__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.gd-history__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 13px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  text-align: left;
+  width: 100%;
+  transition: background var(--transition-fast);
+}
+
+.gd-history__item:hover {
+  background: var(--bg-sunken);
+}
+
+.gd-history__item[data-active='true'] {
+  background: var(--bg-sunken);
+}
+
+.gd-history__item[data-active='true']::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.gd-history__tag {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 6px;
+  padding: 3px 6px;
+}
+
+.gd-history__meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.gd-history__date {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  color: var(--text);
+}
+
+.gd-history__template {
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin-top: 1px;
+}
+
+.gd-history__item:hover .gd-history__delete {
+  opacity: 1;
+}
+
+.gd-history__delete {
+  opacity: 0;
+  flex-shrink: 0;
+}

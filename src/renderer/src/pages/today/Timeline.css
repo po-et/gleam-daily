@@ -1,0 +1,118 @@
+.gd-timeline__head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+  min-height: 20px;
+}
+
+.gd-timeline__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.gd-timeline__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.gd-timeline__track-wrap {
+  position: relative;
+  padding-bottom: 22px;
+}
+
+.gd-timeline__track {
+  position: relative;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--bg-sunken);
+  overflow: visible;
+}
+
+.gd-timeline__block {
+  position: absolute;
+  top: 8px;
+  height: 28px;
+  min-width: 2px;
+  border-radius: 2px;
+  cursor: default;
+}
+
+.gd-timeline__block-tip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-width: 160px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: nowrap;
+  z-index: 30;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--transition-fast);
+  pointer-events: none;
+}
+
+.gd-timeline__block-tip[data-anchor='left'] {
+  left: 0;
+  transform: none;
+}
+
+.gd-timeline__block-tip[data-anchor='right'] {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.gd-timeline__block:hover .gd-timeline__block-tip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.gd-timeline__tip-title {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.gd-timeline__tip-sub {
+  color: var(--text-2);
+}
+
+.gd-timeline__ticks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 18px;
+}
+
+.gd-timeline__tick {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.gd-timeline__banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--accent-soft);
+  border-radius: var(--radius-control);
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 14px;
+}

@@ -1,0 +1,118 @@
+/* 设计令牌。见 docs/DESIGN.md §1。
+   契约提醒：下面这套变量名会被 phase3 的 UI 实现直接引用，禁止改名，只能扩充。 */
+
+:root {
+  --bg: #faf9f5;
+  --bg-sunken: #f0eee6;
+  --surface: #ffffff;
+  --border: #e3e1d9;
+  --border-strong: #d1cfc5;
+  --text: #1f1e1d;
+  --text-2: #6e6c64;
+  --text-3: #9c9a90;
+  --accent: #c15f3c;
+  --accent-hover: #a94f2f;
+  --accent-soft: #c15f3c14;
+  --danger: #b3452f;
+  --ok: #6e7f5e;
+  --shadow-card: 0 1px 3px rgba(30, 25, 20, 0.06);
+
+  /* 圆角节奏（DESIGN §1） */
+  --radius-card: 14px;
+  --radius-control: 10px;
+  --radius-pill: 999px;
+
+  /* 字体（DESIGN §1） */
+  --font-serif: ui-serif, 'Songti SC', Georgia, serif;
+  --font-sans: -apple-system, 'PingFang SC', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', monospace;
+
+  /* 间距节奏（DESIGN §1） */
+  --space-page: 32px;
+  --space-card: 20px;
+  --space-card-gap: 16px;
+
+  /* 动效 */
+  --transition-fast: 0.15s ease;
+  --transition-page: 0.2s ease;
+
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg: #262624;
+  --bg-sunken: #1f1e1d;
+  --surface: #30302e;
+  --border: #3e3d3a;
+  --border-strong: #4a4945;
+  --text: #f0efea;
+  --text-2: #a6a39a;
+  --text-3: #706e67;
+  --accent: #d97757;
+  --accent-hover: #e08a6d;
+  --accent-soft: #d9775722;
+  --danger: #e5735a;
+  --ok: #8fa37e;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3);
+
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #262624;
+    --bg-sunken: #1f1e1d;
+    --surface: #30302e;
+    --border: #3e3d3a;
+    --border-strong: #4a4945;
+    --text: #f0efea;
+    --text-2: #a6a39a;
+    --text-3: #706e67;
+    --accent: #d97757;
+    --accent-hover: #e08a6d;
+    --accent-soft: #d9775722;
+    --danger: #e5735a;
+    --ok: #8fa37e;
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3);
+
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  margin: 0;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+  color: inherit;
+}

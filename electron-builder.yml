@@ -1,0 +1,42 @@
+appId: com.gleam.daily
+productName: 拾光日报
+copyright: Copyright © 2026 Gleam Daily
+
+directories:
+  output: release
+  buildResources: resources
+
+files:
+  - out/**/*
+  - package.json
+  - '!**/*.map'
+
+# tray.ts 在打包环境下从 process.resourcesPath 读取托盘模板图，必须显式拷贝进 Contents/Resources
+extraResources:
+  - from: resources
+    to: .
+    filter:
+      - 'trayTemplate*.png'
+
+asarUnpack:
+  - '**/*.node'
+
+mac:
+  identity: null
+  category: public.app-category.productivity
+  icon: resources/icon.icns
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  target:
+    - target: dmg
+      arch:
+        - arm64
+    - target: zip
+      arch:
+        - arm64
+  extendInfo:
+    NSAppleEventsUsageDescription: 拾光日报需要“自动化”权限以读取当前前台应用与窗口标题，从而记录你的工作时间线。这一切都在本机完成，不会上传任何数据。
+    NSScreenCaptureUsageDescription: 拾光日报需要“屏幕录制”权限用于开启截图分析功能时捕获屏幕内容。截图仅用于本地或你配置的 AI 服务分析，分析完成后会立即删除。
+
+dmg:
+  sign: false

@@ -1,0 +1,38 @@
+.gd-shots__banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--accent-soft);
+  border-radius: var(--radius-control);
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 14px;
+}
+
+.gd-shots__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 9px 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.gd-shots__time {
+  width: 56px;
+  flex-shrink: 0;
+  color: var(--text-2);
+  margin-top: 1px;
+}
+
+.gd-shots__summary {
+  flex: 1;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.gd-shots__summary--muted {
+  color: var(--text-3);
+}

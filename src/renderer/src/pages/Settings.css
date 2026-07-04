@@ -1,0 +1,231 @@
+.gd-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-card-gap);
+  max-width: 720px;
+}
+
+.gd-settings__title {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+/* 卡片内的整块区域（非左右行结构），如 Git 仓库列表、角色描述 */
+.gd-settings__block {
+  padding: 12px 0;
+}
+
+.gd-settings__block + .gd-settings__block,
+.gd-field-row + .gd-settings__block,
+.gd-settings__block + .gd-field-row {
+  border-top: 1px solid var(--border);
+}
+
+.gd-settings__block-label {
+  font-size: 13.5px;
+  color: var(--text);
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.gd-settings__empty-hint {
+  font-size: 12.5px;
+  color: var(--text-3);
+  padding: 4px 0;
+}
+
+.gd-settings__row-actions {
+  display: flex;
+  gap: 8px;
+  padding: 6px 0 12px;
+}
+
+.gd-settings__test-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 14px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.gd-test-result {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+}
+
+.gd-test-result__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.gd-test-result--ok {
+  color: var(--ok);
+}
+.gd-test-result--ok .gd-test-result__dot {
+  background: var(--ok);
+}
+
+.gd-test-result--error {
+  color: var(--danger);
+}
+.gd-test-result--error .gd-test-result__dot {
+  background: var(--danger);
+}
+
+/* Secret / API Key 输入行 */
+.gd-secret {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gd-secret__mask {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text-2);
+  letter-spacing: 0.5px;
+}
+
+/* AI Provider 三选一大卡片 */
+.gd-provider-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gd-provider-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.gd-provider-card:hover:not([data-disabled='true']) {
+  border-color: var(--border-strong);
+}
+
+.gd-provider-card[data-selected='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.gd-provider-card[data-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.gd-provider-card__radio {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  flex-shrink: 0;
+  margin-top: 1px;
+  position: relative;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.gd-provider-card__radio[data-on='true'] {
+  border-color: var(--accent);
+}
+
+.gd-provider-card__radio[data-on='true']::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.gd-provider-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.gd-provider-card__name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.gd-provider-card__desc {
+  font-size: 12.5px;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+.gd-provider-config {
+  margin-top: 6px;
+}
+
+/* 权限行 */
+.gd-perm-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.gd-perm-row + .gd-perm-row {
+  border-top: 1px solid var(--border);
+}
+
+.gd-perm-row__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-3);
+}
+
+.gd-perm-row__dot[data-state='granted'] {
+  background: var(--ok);
+}
+
+.gd-perm-row__dot[data-state='denied'] {
+  background: var(--danger);
+}
+
+.gd-perm-row__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.gd-perm-row__label {
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+.gd-perm-row__state {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-top: 1px;
+}
+
+.gd-settings__footer {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-3);
+  padding: 12px 0 8px;
+}

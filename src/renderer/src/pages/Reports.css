@@ -1,0 +1,19 @@
+.gd-reports {
+  display: flex;
+  gap: var(--space-card-gap);
+  align-items: flex-start;
+  height: 100%;
+}
+
+.gd-reports__left {
+  width: 300px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-card-gap);
+}
+
+.gd-reports__right {
+  flex: 1;
+  min-width: 0;
+}

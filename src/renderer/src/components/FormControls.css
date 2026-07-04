@@ -1,0 +1,132 @@
+.gd-input,
+.gd-select,
+.gd-textarea {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  color: var(--text);
+  font-size: 13.5px;
+  font-family: var(--font-sans);
+  padding: 7px 10px;
+  outline: none;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.gd-input:focus,
+.gd-select:focus,
+.gd-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.gd-input:disabled,
+.gd-select:disabled,
+.gd-textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.gd-textarea {
+  resize: vertical;
+  line-height: 1.6;
+  font-family: var(--font-sans);
+}
+
+.gd-input--mono {
+  font-family: var(--font-mono);
+}
+
+/* 设置页行样式：左标题+副说明，右控件 */
+.gd-field-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 0;
+}
+
+.gd-field-row + .gd-field-row {
+  border-top: 1px solid var(--border);
+}
+
+.gd-field-row__label {
+  font-size: 13.5px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.gd-field-row__desc {
+  font-size: 12.5px;
+  color: var(--text-2);
+  margin-top: 3px;
+  line-height: 1.6;
+  max-width: 420px;
+}
+
+.gd-field-row__desc--danger {
+  color: var(--danger);
+}
+
+.gd-field-row__control {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 1px;
+}
+
+/* 排除应用 / 扫描目录等标签列表 */
+.gd-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gd-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 6px 4px 10px;
+  font-size: 12.5px;
+  color: var(--text);
+}
+
+.gd-tag__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.gd-tag__remove:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.gd-path-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  font-size: 12.5px;
+}
+
+.gd-path-row__path {
+  font-family: var(--font-mono);
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

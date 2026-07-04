@@ -1,0 +1,24 @@
+.gd-gen__field {
+  margin-bottom: 14px;
+}
+
+.gd-gen__field-label {
+  font-size: 12.5px;
+  color: var(--text-2);
+  margin-bottom: 6px;
+  display: block;
+}
+
+.gd-gen__preview {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-bottom: 14px;
+  min-height: 16px;
+}
+
+.gd-gen__stage {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-top: 8px;
+  text-align: center;
+}

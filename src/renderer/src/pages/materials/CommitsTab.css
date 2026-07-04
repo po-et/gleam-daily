@@ -1,0 +1,66 @@
+.gd-commits__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.gd-commits__group {
+  margin-bottom: 18px;
+}
+
+.gd-commits__group:last-child {
+  margin-bottom: 0;
+}
+
+.gd-commits__group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.gd-commits__group-count {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+
+.gd-commits__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.gd-commits__hash {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.gd-commits__message {
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gd-commits__stat {
+  flex-shrink: 0;
+  display: flex;
+  gap: 6px;
+}
+
+.gd-commits__ins {
+  color: var(--ok);
+}
+
+.gd-commits__del {
+  color: var(--danger);
+}

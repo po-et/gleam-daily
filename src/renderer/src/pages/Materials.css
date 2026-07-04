@@ -1,0 +1,27 @@
+.gd-materials {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 1080px;
+}
+
+.gd-materials__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.gd-materials__datenav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gd-materials__date-heading {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  color: var(--text);
+  min-width: 140px;
+}

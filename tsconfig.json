@@ -1,0 +1,4 @@
+{
+  "//": "Root placeholder. Actual typechecking runs against tsconfig.node.json (main/preload/shared/scripts) and tsconfig.web.json (renderer) separately — see package.json `typecheck` script.",
+  "files": []
+}

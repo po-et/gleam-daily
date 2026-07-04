@@ -1,0 +1,43 @@
+.gd-segment {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-sunken);
+  border-radius: 999px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.gd-segment--block {
+  display: flex;
+  width: 100%;
+}
+
+.gd-segment__item {
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-family: var(--font-sans);
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.gd-segment--block .gd-segment__item {
+  flex: 1;
+}
+
+.gd-segment__item[data-active='true'] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-card);
+}
+
+.gd-segment__item:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}

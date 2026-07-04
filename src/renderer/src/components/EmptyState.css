@@ -1,0 +1,26 @@
+.gd-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-3);
+  gap: 12px;
+}
+
+.gd-empty__icon {
+  color: var(--text-3);
+}
+
+.gd-empty__text {
+  font-size: 13.5px;
+  color: var(--text-2);
+  line-height: 1.6;
+  max-width: 320px;
+}
+
+.gd-empty__banner-text {
+  font-size: 13px;
+  color: var(--text);
+}

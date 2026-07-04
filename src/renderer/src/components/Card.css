@@ -1,0 +1,32 @@
+.gd-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-card);
+}
+
+.gd-card--flush {
+  padding: 0;
+}
+
+.gd-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.gd-card__title {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+.gd-card__subtitle {
+  font-size: 12.5px;
+  color: var(--text-2);
+  margin-top: 2px;
+}

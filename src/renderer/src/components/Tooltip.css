@@ -1,0 +1,29 @@
+.gd-tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+}
+
+.gd-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: nowrap;
+  z-index: 60;
+  pointer-events: none;
+}
+
+.gd-tooltip--wrap {
+  white-space: normal;
+  width: max-content;
+  max-width: 260px;
+}
