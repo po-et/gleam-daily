@@ -1,5 +1,7 @@
 appId: com.gleam.daily
 productName: 拾光日报
+# GitHub Release 会剥掉资产文件名中的非 ASCII 字符，产物统一用英文名（应用显示名仍是「拾光日报」）
+artifactName: GleamDaily-${version}-${arch}.${ext}
 copyright: Copyright © 2026 Gleam Daily
 
 directories:
