@@ -114,7 +114,7 @@ graph LR
 ## 🛠 参与开发
 
 ```bash
-git clone https://github.com/<your-name>/gleam-daily.git
+git clone https://github.com/po-et/gleam-daily.git
 cd gleam-daily
 npm install        # postinstall 自动为 Electron 重编译 better-sqlite3
 npm run dev        # 热重载开发
