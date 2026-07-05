@@ -22,3 +22,12 @@
   margin-top: 8px;
   text-align: center;
 }
+
+/* 详略分段：每档用 Tooltip 包裹按钮，令 tooltip-wrap 撑满等分（DESIGN §14）。 */
+.gd-gen__detail .gd-tooltip-wrap {
+  flex: 1;
+}
+
+.gd-gen__detail .gd-segment__item {
+  width: 100%;
+}

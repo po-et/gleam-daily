@@ -3,6 +3,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from '../shared/ipc-channels';
 import type {
   AnalyzeNowResult,
+  AppUsagePeriod,
+  AppUsageSummary,
   Category,
   DeepPartial,
   ExportResult,
@@ -76,6 +78,8 @@ const gleamApi = {
     getTopApps: (days: number): Promise<TopApp[]> => ipcRenderer.invoke(IPC_CHANNELS.stats.getTopApps, days),
     getCategoryTotals: (days: number): Promise<Partial<Record<Category, number>>> =>
       ipcRenderer.invoke(IPC_CHANNELS.stats.getCategoryTotals, days),
+    getAppUsage: (period: AppUsagePeriod): Promise<AppUsageSummary> =>
+      ipcRenderer.invoke(IPC_CHANNELS.stats.getAppUsage, period),
   },
   memory: {
     get: (): Promise<MemoryState> => ipcRenderer.invoke(IPC_CHANNELS.memory.get),

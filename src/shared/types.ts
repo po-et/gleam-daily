@@ -57,6 +57,8 @@ export interface GitCommit {
 
 export type ReportType = 'daily' | 'weekly' | 'monthly';
 export type ReportTemplate = 'standard' | 'concise' | 'technical' | 'okr';
+/** v1.4：详略等级，与模板正交（模板管结构，详略管展开度）。 */
+export type ReportDetailLevel = 'concise' | 'standard' | 'rich';
 
 export interface Report {
   id: number;
@@ -104,6 +106,27 @@ export interface TopApp {
   app: string;
   ms: number;
   category: Category; // 该 app 时长最多的分类
+}
+
+// --- v1.4 应用记录（SPEC §18.A）---
+
+export type AppUsagePeriod = 'today' | 'week' | 'month' | '30d';
+
+export interface AppUsageRow {
+  app: string;
+  ms: number;
+  pct: number; // 占 totalMs 百分比（0-100，原始数值，格式化交给渲染层）
+  category: Category;
+  firstTs: number; // 周期内该 app 首个 session 开始
+  lastTs: number; // 周期内该 app 最后一个 session 结束
+}
+
+export interface AppUsageSummary {
+  period: AppUsagePeriod;
+  totalApps: number;
+  totalMs: number;
+  avgDailyMs: number; // totalMs / 周期内有记录的天数
+  apps: AppUsageRow[]; // 按 ms 降序，全量（截断是 UI 的事）
 }
 
 // --- v1.3 记忆（SPEC §17.A）---
@@ -203,7 +226,7 @@ export interface Settings {
     visionModel: string; // 截图分析用，默认 'claude-haiku-4-5-20251001'（cli 时用 'haiku'）
     roleContext: string; // 用户角色描述，拼入 prompt
   };
-  report: { defaultTemplate: ReportTemplate };
+  report: { defaultTemplate: ReportTemplate; defaultDetail: ReportDetailLevel }; // defaultDetail 默认 'standard'
   memory: {
     enabled: boolean; // 默认 true
     injectToVision: boolean; // 默认 true
@@ -226,6 +249,7 @@ export interface ReportGenOptions {
   type: ReportType;
   date: string; // daily: 该日; weekly: 该周任一天; monthly: 该月任一天
   template: ReportTemplate;
+  detail?: ReportDetailLevel; // v1.4：缺省取 settings.report.defaultDetail
   extraInstructions?: string;
 }
 

@@ -42,7 +42,7 @@ const DEFAULT_SETTINGS: Settings = {
     visionModel: 'claude-haiku-4-5-20251001',
     roleContext: '',
   },
-  report: { defaultTemplate: 'standard' },
+  report: { defaultTemplate: 'standard', defaultDetail: 'standard' },
   memory: { enabled: true, injectToVision: true, injectToReports: true, autoRefresh: 'weekly' },
   scheduledReport: { enabled: false, time: '18:00', template: 'standard', extraInstructions: '' },
   mcp: { enabled: false, port: 41414 },

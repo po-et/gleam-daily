@@ -13,7 +13,7 @@ import { getSettings } from './settings';
 import { getCurrentForegroundApp, shouldSkipCaptureNow } from './tracker';
 
 const VISION_PROMPT = `请观察这张屏幕截图，只输出一个严格的 JSON 对象（不要 Markdown 代码块、不要任何额外文字），格式如下：
-{"summary": "一句话描述用户正在做的具体工作（中文，尽量包含关键实体，如项目名/文档名/网站名）", "category": "dev|meeting|comm|docs|design|research|leisure|other", "sensitive": false}
+{"summary": "用 1-2 句、总长不超过 80 字描述用户正在做的具体工作（中文，单行输出、不要换行；务必保留画面中可见的专有名词，如项目名/文档名/页面标题/代码文件名/网站名）", "category": "dev|meeting|comm|docs|design|research|leisure|other", "sensitive": false}
 其中 sensitive 表示画面中是否包含密码输入框、支付/银行信息、聊天中的私人内容、身份证件等敏感信息，命中任一即为 true。`;
 
 const CAPTURE_RETRY_LIMIT = 1; // 分析失败重试 1 次（总计尝试 2 次）

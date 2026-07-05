@@ -1,7 +1,7 @@
 // 设置读写：userData/settings.json + safeStorage 加密 API Key。
 // 磁盘上存的是 PersistedSettings（含加密后的 key），对外（渲染层）只暴露 Settings（hasKey/keyMasked 脱敏视图）。
 import fs from 'node:fs';
-import type { AiProviderKind, DeepPartial, ReportTemplate, Settings } from '../shared/types';
+import type { AiProviderKind, DeepPartial, ReportDetailLevel, ReportTemplate, Settings } from '../shared/types';
 import { resolveSettingsPath } from './paths';
 
 type SecretKind = 'anthropic' | 'openaiCompat';
@@ -28,6 +28,8 @@ interface PersistedSettings {
 }
 
 const DEFAULT_TEMPLATE: ReportTemplate = 'standard';
+// v1.4：详略等级默认 'standard'（SPEC §18.B3）。与模板正交，Generator 缺省时读取此值。
+const DEFAULT_DETAIL: ReportDetailLevel = 'standard';
 
 function defaultPersistedSettings(): PersistedSettings {
   return {
@@ -57,7 +59,7 @@ function defaultPersistedSettings(): PersistedSettings {
       visionModel: 'claude-haiku-4-5-20251001',
       roleContext: '',
     },
-    report: { defaultTemplate: DEFAULT_TEMPLATE },
+    report: { defaultTemplate: DEFAULT_TEMPLATE, defaultDetail: DEFAULT_DETAIL },
     memory: {
       enabled: true,
       injectToVision: true,

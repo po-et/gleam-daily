@@ -1,7 +1,7 @@
 {
   "name": "gleam-daily",
   "productName": "拾光日报",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "macOS 本地日报助手：静默记录工作轨迹，一键生成日报/周报/月报。数据 100% 本地存储。Privacy-first local work journal & AI daily report assistant for macOS.",
   "private": true,
   "license": "MIT",

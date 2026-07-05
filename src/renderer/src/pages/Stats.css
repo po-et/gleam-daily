@@ -184,7 +184,114 @@
   background: var(--gd-heat-0);
 }
 
-/* 4. 应用时长 Top */
+/* 4. 应用记录（DESIGN §13）：三迷你卡 + Top15 条形（.gd-topapps）+ 明细表 */
+
+/* 三迷你卡：沉底小面板，serif 数字（与概览卡同气质但更小） */
+.gd-appusage__minis {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.gd-appusage__mini {
+  background: var(--bg-sunken);
+  border-radius: var(--radius-control);
+  padding: 12px 14px;
+}
+
+.gd-appusage__mini-value {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.gd-appusage__mini-unit {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-2);
+  margin-left: 3px;
+}
+
+.gd-appusage__mini-caption {
+  font-size: 12.5px;
+  color: var(--text-3);
+  margin-top: 3px;
+}
+
+/* 明细表：外层可横向滚动（窄窗口） */
+.gd-appusage__tablewrap {
+  overflow-x: auto;
+  margin-top: 14px;
+}
+
+.gd-appusage__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.gd-appusage__table th {
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--text-3);
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.gd-appusage__th-num {
+  text-align: right;
+}
+
+.gd-appusage__table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.gd-appusage__tr {
+  transition: background var(--transition-fast);
+}
+
+.gd-appusage__tr:hover {
+  background: var(--bg-sunken);
+}
+
+.gd-appusage__appcell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gd-appusage__td-num {
+  text-align: right;
+  color: var(--text-2);
+}
+
+.gd-appusage__td-first,
+.gd-appusage__td-last {
+  color: var(--text-2);
+}
+
+.gd-appusage__expand {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+/* <720px 隐藏「首次使用」列（DESIGN §13） */
+@media (max-width: 720px) {
+  .gd-appusage__th-first,
+  .gd-appusage__td-first {
+    display: none;
+  }
+}
+
+/* Top 15 条形 */
 .gd-topapps {
   display: flex;
   flex-direction: column;

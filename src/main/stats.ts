@@ -1,6 +1,6 @@
 // v1.3 统计聚合（SPEC §17.B）。全部基于 sessions 表按本地时区聚合；跨天 session 按本地天边界切分后归属。
 // 实现策略：一次取范围内 sessions，在 JS 内切分聚合（365 天量级 ≤ 数万行，可接受）。
-import type { Category, HeatmapDay, StatsOverview, TopApp } from '../shared/types';
+import type { AppUsagePeriod, AppUsageRow, AppUsageSummary, Category, HeatmapDay, StatsOverview, TopApp } from '../shared/types';
 import { getDb, getSessions } from './db';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -180,4 +180,103 @@ export function getCategoryTotals(days: number): Partial<Record<Category, number
     totals[s.category] = (totals[s.category] ?? 0) + dur;
   }
   return totals;
+}
+
+// --- v1.4 应用记录（SPEC §18.A）---
+
+/**
+ * 周期边界（均到「此刻」为止）：
+ * - today：今日 00:00
+ * - week：本周周一 00:00
+ * - month：本月 1 号 00:00
+ * - 30d：近 30 天（今天在内共 30 个自然日）的起始 00:00
+ */
+function rangeForPeriod(period: AppUsagePeriod): { startTs: number; endTs: number } {
+  const now = Date.now();
+  const todayStart = startOfDayTs(now);
+  switch (period) {
+    case 'today':
+      return { startTs: todayStart, endTs: now };
+    case 'week': {
+      const d = new Date(now);
+      const mondayOffset = (d.getDay() + 6) % 7; // 0=周一
+      return { startTs: todayStart - mondayOffset * DAY_MS, endTs: now };
+    }
+    case 'month': {
+      const d = new Date(now);
+      const monthStart = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0).getTime();
+      return { startTs: monthStart, endTs: now };
+    }
+    case '30d':
+      return { startTs: todayStart - 29 * DAY_MS, endTs: now };
+  }
+}
+
+/**
+ * 应用记录（SPEC §18.A）：跨天/跨界 session 裁剪到周期边界后按 app 聚合。
+ * - apps 按 ms 降序全量返回（截断交给 UI）；pct 为占 totalMs 的原始百分比；
+ * - category 取该 app 时长最多的分类；firstTs/lastTs 为周期内该 app 首末 session 边界（已裁剪到周期内）；
+ * - avgDailyMs = totalMs / 周期内「有记录的天数」（无记录天不摊薄）。
+ */
+export function getAppUsage(period: AppUsagePeriod): AppUsageSummary {
+  const { startTs, endTs } = rangeForPeriod(period);
+
+  interface AppAgg {
+    ms: number;
+    cats: Map<Category, number>;
+    firstTs: number;
+    lastTs: number;
+  }
+
+  const byApp = new Map<string, AppAgg>();
+  let totalMs = 0;
+
+  if (endTs > startTs) {
+    const sessions = getSessions(startTs, endTs);
+    for (const s of sessions) {
+      const cs = Math.max(s.startTs, startTs);
+      const ce = Math.min(s.endTs, endTs);
+      const dur = ce - cs;
+      if (dur <= 0) continue;
+      totalMs += dur;
+      const entry = byApp.get(s.app) ?? { ms: 0, cats: new Map<Category, number>(), firstTs: cs, lastTs: ce };
+      entry.ms += dur;
+      entry.cats.set(s.category, (entry.cats.get(s.category) ?? 0) + dur);
+      if (cs < entry.firstTs) entry.firstTs = cs;
+      if (ce > entry.lastTs) entry.lastTs = ce;
+      byApp.set(s.app, entry);
+    }
+  }
+
+  const apps: AppUsageRow[] = [...byApp.entries()].map(([app, info]) => {
+    let topCat: Category = 'other';
+    let max = -1;
+    for (const [cat, ms] of info.cats) {
+      if (ms > max) {
+        max = ms;
+        topCat = cat;
+      }
+    }
+    return {
+      app,
+      ms: info.ms,
+      pct: totalMs > 0 ? (info.ms / totalMs) * 100 : 0,
+      category: topCat,
+      firstTs: info.firstTs,
+      lastTs: info.lastTs,
+    };
+  });
+  apps.sort((a, b) => b.ms - a.ms);
+
+  // 有记录的天数：复用按天切分逻辑，只数 ms>0 的自然日。
+  const recordedDays = endTs > startTs ? buildDayMsMap(startTs, endTs).size : 0;
+  const avgDailyMs = recordedDays > 0 ? Math.round(totalMs / recordedDays) : 0;
+
+  return {
+    period,
+    totalApps: apps.length,
+    totalMs,
+    avgDailyMs,
+    apps,
+  };
 }

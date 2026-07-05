@@ -1,10 +1,11 @@
-// 报告生成器卡片（DESIGN §4）：类型/日期/模板/补充要求/素材预览/生成按钮。
+// 报告生成器卡片（DESIGN §4 + §14）：类型/日期/模板/详略/补充要求/素材预览/生成按钮。
 import { useEffect, useState, type JSX } from 'react';
-import type { MaterialPreview, ReportGenOptions, ReportTemplate, ReportType } from '@shared/types';
+import type { MaterialPreview, ReportDetailLevel, ReportGenOptions, ReportTemplate, ReportType } from '@shared/types';
 import { api } from '../../api';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
 import SegmentControl from '../../components/SegmentControl';
+import Tooltip from '../../components/Tooltip';
 import { Input, Select, Textarea } from '../../components/FormControls';
 import './Generator.css';
 
@@ -23,12 +24,26 @@ const TEMPLATE_OPTIONS: { value: ReportTemplate; label: string }[] = [
   { value: 'okr', label: 'OKR' },
 ];
 
+// 详略维度（DESIGN §14）：与模板正交。每档一句 hover 说明。
+const DETAIL_OPTIONS: { value: ReportDetailLevel; label: string }[] = [
+  { value: 'concise', label: '简要' },
+  { value: 'standard', label: '标准' },
+  { value: 'rich', label: '详尽' },
+];
+
+const DETAIL_TOOLTIP: Record<ReportDetailLevel, string> = {
+  concise: '只留最重要的 3-5 件事',
+  standard: '均衡的篇幅与细节',
+  rich: '逐项展开，引用具体文件与数据，生成时间约长一倍',
+};
+
 export type GeneratingStage = 'idle' | 'collecting' | 'generating';
 
 export interface GeneratorState {
   type: ReportType;
   date: string;
   template: ReportTemplate;
+  detail: ReportDetailLevel;
   extraInstructions: string;
 }
 
@@ -69,7 +84,26 @@ export default function Generator({ state, onChange, stage, onGenerate }: Genera
     };
   }, [state.type, state.date, state.template]);
 
-  const stageText = stage === 'collecting' ? '整理素材…' : stage === 'generating' ? 'AI 撰写中…' : `生成${TYPE_LABEL[state.type]}`;
+  // 切换详略：更新表单 + 即时持久化到 settings.report.defaultDetail（DESIGN §14）。
+  function handleDetailChange(detail: ReportDetailLevel): void {
+    if (detail === state.detail) return;
+    onChange({ ...state, detail });
+    void api.settings.set({ report: { defaultDetail: detail } }).catch(() => {
+      // 持久化失败不打扰用户，当前表单选择仍生效。
+    });
+  }
+
+  // 生成中文案：详尽档第一段（collecting）显示「AI 正在梳理工作项…」，其余显示现文案；
+  // 第二段（generating）统一「AI 撰写中…」。现有进度事件仅 collecting/generating 两段，
+  // rich 的两段式提取/成稿都在 generating 内，无法再细分，故按此映射（不改主进程）。
+  const stageText =
+    stage === 'collecting'
+      ? state.detail === 'rich'
+        ? 'AI 正在梳理工作项…'
+        : '整理素材…'
+      : stage === 'generating'
+        ? 'AI 撰写中…'
+        : `生成${TYPE_LABEL[state.type]}`;
 
   return (
     <Card title="生成日报">
@@ -86,6 +120,27 @@ export default function Generator({ state, onChange, stage, onGenerate }: Genera
       <div className="gd-gen__field">
         <span className="gd-gen__field-label">模板</span>
         <Select value={state.template} onChange={(template) => onChange({ ...state, template })} options={TEMPLATE_OPTIONS} style={{ width: '100%' }} />
+      </div>
+
+      <div className="gd-gen__field">
+        <span className="gd-gen__field-label">详略</span>
+        {/* 复用 SegmentControl 的 .gd-segment 视觉 + Tooltip 逐档说明（原生 SegmentControl 无逐项 tooltip 能力）。 */}
+        <div className="gd-segment gd-segment--block gd-no-drag gd-gen__detail" role="tablist">
+          {DETAIL_OPTIONS.map((opt) => (
+            <Tooltip key={opt.value} content={DETAIL_TOOLTIP[opt.value]} wrap>
+              <button
+                type="button"
+                role="tab"
+                className="gd-segment__item"
+                data-active={opt.value === state.detail}
+                aria-selected={opt.value === state.detail}
+                onClick={() => handleDetailChange(opt.value)}
+              >
+                {opt.label}
+              </button>
+            </Tooltip>
+          ))}
+        </div>
       </div>
 
       <div className="gd-gen__field">

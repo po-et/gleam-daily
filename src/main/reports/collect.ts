@@ -13,6 +13,8 @@ import type {
   Session,
 } from '../../shared/types';
 import { getCommits, getScreenshotAnalyses, getSessions, listManualRecords, listNotes, listReports } from '../db';
+import { computeDayStats } from '../dayStats';
+import { getCategoryTotals, getTopApps } from '../stats';
 
 const SCREENSHOT_SAMPLE_LIMIT = 60;
 
@@ -21,6 +23,8 @@ export interface ReportMaterial {
   periodEnd: string; // YYYY-MM-DD（daily 时等于 periodStart）
   /** daily：当期原始 session 聚合；weekly/monthly：优先复用已有日报，没有日报的天回退原始聚合。 */
   timelineText: string;
+  /** v1.4：<时间统计> 小节——报告中的时长/数字应以此为准（SPEC §18.B2）。 */
+  statsText: string;
   screenshotsText: string;
   commitsText: string;
   notesText: string;
@@ -209,6 +213,61 @@ function buildTimelineForPeriod(type: ReportType, start: string, end: string, se
   return { text, dailyReportCount };
 }
 
+/**
+ * <时间统计> 小节（SPEC §18.B2）。数字来源单一、供 prompt 强约束「时长/数字必须来自此处」。
+ * - daily：当日 DayStats（总活跃 / Top 8 应用 / 分类时长 / 专注块 / 上下文切换）。
+ * - weekly/monthly：stats.getTopApps/getCategoryTotals（7/30 天）聚合 + 周期总活跃。
+ */
+function buildStatsSection(type: ReportType, start: string, sessions: Session[]): string {
+  if (type === 'daily') {
+    const s = computeDayStats(start, sessions);
+    const lines: string[] = [];
+    lines.push(`当日活跃总时长：${formatDuration(s.totalActiveMs)}`);
+
+    if (s.topApps.length > 0) {
+      lines.push('Top 应用（按时长，最多 8 个）：');
+      for (const a of s.topApps) lines.push(`- ${a.app}：${formatDuration(a.ms)}`);
+    }
+
+    const catEntries = Object.entries(s.byCategory) as [Category, number][];
+    if (catEntries.length > 0) {
+      lines.push('分类时长分布：');
+      for (const [cat, ms] of catEntries.sort((a, b) => b[1] - a[1])) {
+        lines.push(`- ${CATEGORY_META[cat].label}：${formatDuration(ms)}`);
+      }
+    }
+
+    const longestFocus = s.focusBlocks.reduce((mx, b) => Math.max(mx, b.endTs - b.startTs), 0);
+    lines.push(`专注块：${s.focusBlocks.length} 个${longestFocus > 0 ? `，最长 ${formatDuration(longestFocus)}` : ''}`);
+    lines.push(`上下文切换：${s.contextSwitches} 次`);
+    return lines.join('\n');
+  }
+
+  // weekly / monthly：按近 7 / 30 天聚合。
+  const days = type === 'weekly' ? 7 : 30;
+  const topApps = getTopApps(days);
+  const catTotals = getCategoryTotals(days);
+  const periodTotalMs = Object.values(catTotals).reduce((sum, ms) => sum + (ms ?? 0), 0);
+
+  const lines: string[] = [];
+  lines.push(`（基于近 ${days} 天聚合）`);
+  lines.push(`周期活跃总时长：${formatDuration(periodTotalMs)}`);
+
+  if (topApps.length > 0) {
+    lines.push('Top 应用（按时长）：');
+    for (const a of topApps) lines.push(`- ${a.app}（${CATEGORY_META[a.category].label}）：${formatDuration(a.ms)}`);
+  }
+
+  const catEntries = Object.entries(catTotals) as [Category, number][];
+  if (catEntries.length > 0) {
+    lines.push('分类时长分布：');
+    for (const [cat, ms] of catEntries.sort((a, b) => b[1] - a[1])) {
+      lines.push(`- ${CATEGORY_META[cat].label}：${formatDuration(ms)}`);
+    }
+  }
+  return lines.join('\n');
+}
+
 export async function collectMaterial(opts: ReportGenOptions): Promise<ReportMaterial> {
   const { start, end } = resolvePeriod(opts.type, opts.date);
   const startTs = toMidnightTs(start);
@@ -221,6 +280,7 @@ export async function collectMaterial(opts: ReportGenOptions): Promise<ReportMat
   const manualRecords = listManualRecords(startTs, endTsExclusive);
 
   const { text: timelineText, dailyReportCount } = buildTimelineForPeriod(opts.type, start, end, sessions);
+  const statsText = buildStatsSection(opts.type, start, sessions);
 
   const activeMs = sessions.reduce((sum, s) => sum + Math.max(0, s.endTs - s.startTs), 0);
   const analyzedScreenshotCount = screenshots.filter((s) => s.status === 'analyzed').length;
@@ -239,6 +299,7 @@ export async function collectMaterial(opts: ReportGenOptions): Promise<ReportMat
     periodStart: start,
     periodEnd: end,
     timelineText,
+    statsText,
     screenshotsText: formatScreenshots(screenshots),
     commitsText: formatCommits(commits),
     notesText: formatNotes(notes),

@@ -1,6 +1,6 @@
 // 报告页（DESIGN §4）：左列生成器+历史，右侧纸感预览编辑。
 import { useCallback, useEffect, useState, type JSX } from 'react';
-import type { Report, ReportGenOptions, ReportTemplate } from '@shared/types';
+import type { Report, ReportDetailLevel, ReportGenOptions, ReportTemplate } from '@shared/types';
 import { api } from '../api';
 import { todayDateString } from '../lib/format';
 import { parseHashQuery, stripHashQuery, subscribeAppNavigate } from '../lib/navigate';
@@ -11,6 +11,7 @@ import PreviewPane from './reports/PreviewPane';
 import './Reports.css';
 
 const DEFAULT_TEMPLATE: ReportTemplate = 'standard';
+const DEFAULT_DETAIL: ReportDetailLevel = 'standard';
 
 export default function Reports(): JSX.Element {
   const { showToast } = useToast();
@@ -18,6 +19,7 @@ export default function Reports(): JSX.Element {
     type: 'daily',
     date: todayDateString(),
     template: DEFAULT_TEMPLATE,
+    detail: DEFAULT_DETAIL,
     extraInstructions: '',
   });
   const [stage, setStage] = useState<GeneratingStage>('idle');
@@ -44,6 +46,22 @@ export default function Reports(): JSX.Element {
   useEffect(() => {
     void refreshList();
   }, [refreshList]);
+
+  // 初始化「详略」默认值：读 settings.report.defaultDetail（DESIGN §14），失败则保持 standard。
+  useEffect(() => {
+    let disposed = false;
+    void (async () => {
+      try {
+        const s = await api.settings.get();
+        if (!disposed) setGenState((prev) => ({ ...prev, detail: s.report.defaultDetail }));
+      } catch {
+        // 读设置失败：保持默认 standard。
+      }
+    })();
+    return () => {
+      disposed = true;
+    };
+  }, []);
 
   useEffect(() => {
     const unsubscribe = api.reports.onProgress((p) => {
@@ -98,6 +116,7 @@ export default function Reports(): JSX.Element {
       type: genState.type,
       date: genState.date,
       template: genState.template,
+      detail: genState.detail,
       extraInstructions: genState.extraInstructions.trim() || undefined,
     });
   }

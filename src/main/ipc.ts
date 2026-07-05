@@ -5,6 +5,8 @@ import { BrowserWindow, app as electronApp, dialog, ipcMain, shell } from 'elect
 import { IPC_CHANNELS } from '../shared/ipc-channels';
 import type {
   AnalyzeNowResult,
+  AppUsagePeriod,
+  AppUsageSummary,
   Category,
   DeepPartial,
   ExportResult,
@@ -146,6 +148,11 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.stats.getCategoryTotals,
     async (_event, days: number): Promise<Partial<Record<Category, number>>> => stats.getCategoryTotals(days),
+  );
+
+  // v1.4 应用记录（SPEC §18.A）
+  ipcMain.handle(IPC_CHANNELS.stats.getAppUsage, async (_event, period: AppUsagePeriod): Promise<AppUsageSummary> =>
+    stats.getAppUsage(period),
   );
 
   // ---------------------------------------------------------------------

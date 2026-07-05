@@ -136,7 +136,8 @@ async function runScheduledReport(
   }
 
   const beforeMaxId = dailyReportsForDate(date).reduce((mx, r) => Math.max(mx, r.id), 0);
-  await generateReport({ type: 'daily', date, template, extraInstructions });
+  // v1.4：定时日报按用户配置的默认详略等级生成（SPEC §18.B3）。
+  await generateReport({ type: 'daily', date, template, extraInstructions, detail: getSettings().report.defaultDetail });
   const created = dailyReportsForDate(date).some((r) => r.id > beforeMaxId);
 
   let res: StoredResult;

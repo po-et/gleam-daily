@@ -497,3 +497,49 @@ clearAllData() 追加清空 manual_records 与 meta。
 7. MCP：开启后用真实 MCP 客户端（Claude Code CLI 或脚本）调用 ≥3 个工具返回正确数据；设置页请求日志出现对应条目；关闭后端口即时释放。
 8. 全部新增 Settings 字段经 deepMerge 从旧 settings.json 平滑迁移。
 9. typecheck 双 tsconfig 通过；`npm run build:mac` 打包后上述功能在打包版可用（抽查 2/5/7）。
+
+---
+
+## 18. v1.4 增量规格（应用记录 + 报告丰富度）
+
+> 契约层（types/ipc-channels/preload）由设计者直接写入代码，实施时只对齐不修改。
+
+### 18.A 应用记录（统计页应用时长区升级，SPEC §17.B 的扩展）
+
+- 类型（types.ts）：
+  - `AppUsagePeriod = 'today' | 'week' | 'month' | '30d'`（week=本周周一起，month=本月 1 号起，均到「现在」为止）
+  - `AppUsageRow { app, ms, pct, category, firstTs, lastTs }`——pct 为占 totalMs 的百分比（0-100，1 位小数由渲染层处理，主进程给原始数值）；category 取该 app 时长最多的分类；firstTs/lastTs 为该周期内首末 session 边界
+  - `AppUsageSummary { period, totalApps, totalMs, avgDailyMs, apps }`——apps 按 ms 降序**全量**返回（不截断，截断是 UI 的事）；avgDailyMs = totalMs / 周期内有记录的天数（无记录天不摊薄）
+- 查询（stats.ts 新增 `getAppUsage(period)`）：跨天/跨界 session 裁剪到周期边界后聚合，与 §17.B 同一套切块逻辑。
+- IPC：`stats.getAppUsage`。
+- UI（统计页原「应用时长 Top」区替换为「应用记录」）：SegmentControl（今日/本周/本月/近30天，默认今日）+ 三枚迷你卡（总应用数/总时长/日均时长）+ Top 15 条形（沿用现有实现）+ 完整明细表（应用名+分类色点/时长/占比/首次使用 HH:mm（today）或 M月D日（其余周期）/最后使用），>15 行折叠显示「展开全部 N 个应用」。空态沿用 EmptyState。
+
+### 18.B 报告丰富度
+
+**B1 视觉摘要放宽（screenshots.ts）**：截图分析 prompt 由「一句话」放宽为「1-2 句、总长不超过 80 字」，并强制要求：保留画面中可见的项目名/文档名/页面标题/代码文件名等专有名词；仍单行输出；敏感熔断规则不变。
+
+**B2 统计素材块（collect.ts / prompts.ts）**：素材新增 `<时间统计>` 小节：
+- daily：当日 DayStats——总活跃、Top 8 应用及时长、分类时长分布、专注块（数量与最长）、上下文切换次数
+- weekly/monthly：`stats.getTopApps/getCategoryTotals`（7/30 天）聚合 + 周期总活跃
+- prompt 指示：报告中的时长与数字必须来自该小节，禁止编造。
+
+**B3 详略等级（与模板正交）**：
+- 类型：`ReportDetailLevel = 'concise' | 'standard' | 'rich'`；`ReportGenOptions.detail?: ReportDetailLevel`（缺省取 settings）；`Settings.report.defaultDetail: ReportDetailLevel`（默认 'standard'，Generator 变更即存）。
+- prompts 锚点：
+  - concise：全文 200-350 字，只保留当天最重要的 3-5 件事
+  - standard：现行为，全文 350-600 字
+  - rich：每个工作项展开 2-4 句（背景/做了什么/进展或结果），必须引用素材中的具体名词与数字（文件、页面、时长、提交规模），全文 600-1200 字，小节内用列表；**禁止**「进行了多项工作」「完成了相关任务」这类空泛概括句。
+- 模板四选保持不变，四种模板 × 三档详略自由组合。
+
+**B4 两段式生成（generator.ts，仅 daily × rich）**：
+1. 第一段：`buildExtractPrompt(material)` → 让 AI 从素材提取「工作项清单」（每行一项：`- [分类] 一句话 + 关键名词`，8-20 项，只提取不解读）
+2. 第二段：清单 + 素材 + 模板锚点 → 正式成稿（prompt 要求逐项覆盖清单，不得丢项）
+3. 第一段失败（异常/空输出）→ 回退单段生成，不阻塞
+4. 进度事件不变（两段都在 'generating' 阶段内）；weekly/monthly 与非 rich 均走原单段路径。
+
+### 18.C 验收（v1.4）
+
+1. 应用记录四个周期数据正确（与 DB 手工核对今日 top1 应用时长误差 < 1 分钟）；占比合计 ≈100%；首末时间正确；空周期给空态。
+2. 详尽日报真实生成：与标准档同素材对比，字数 ≥ 600、包含 ≥3 个素材中的专有名词与 ≥3 个具体数字；两段式清单在日志可见；concise 档 ≤ 350 字左右。
+3. 视觉摘要新 prompt 真实截图验证：输出含专有名词、≤2 句。
+4. 旧 settings 平滑迁移（defaultDetail 默认 standard）；typecheck 双绿；打包版抽查应用记录 + 详尽生成。

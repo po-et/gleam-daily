@@ -33,6 +33,8 @@ export const IPC_CHANNELS = {
     getHourMatrix: 'stats:getHourMatrix',
     getTopApps: 'stats:getTopApps',
     getCategoryTotals: 'stats:getCategoryTotals',
+    // v1.4 应用记录（SPEC §18.A）
+    getAppUsage: 'stats:getAppUsage',
   },
   // v1.3 记忆（SPEC §17.A）
   memory: {
