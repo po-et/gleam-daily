@@ -4,7 +4,7 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { AnalyzeNowResult, Category, ScreenshotAnalysis } from '../shared/types';
-import { getStaleScreenshots, insertScreenshot, markScreenshotDeleted, updateScreenshotAnalysis } from './db';
+import { getRetainedScreenshotsBefore, getStaleScreenshots, insertScreenshot, markScreenshotDeleted, updateScreenshotAnalysis } from './db';
 import { getProvider, humanizeProviderError } from './ai';
 import { buildVisionMemoryInjection } from './memory';
 import { resolveScreenshotsDir } from './paths';
@@ -253,6 +253,37 @@ function cleanupStaleFiles(): void {
   const rows = getStaleScreenshots(Date.now() - STALE_FILE_MAX_AGE_MS);
   for (const row of rows) {
     removeFileAndMark(row.id, row.path);
+  }
+  cleanupRetainedFiles();
+}
+
+/**
+ * v1.4.1 保留期限清理：keepDays > 0 时删除超期的「保留原始截图」原图（只删文件，分析摘要保留）。
+ * 不看当前 keepAfterAnalysis 开关——用户关闭保留后，之前留下的旧图同样应按期限清掉。
+ * 除随 24h 任务执行外，设置 keepDays 变更时由 ipc.ts 立即调用一次（用户改成 7 天就期望马上腾出空间）。
+ */
+export function cleanupRetainedFiles(): void {
+  const keepDays = getSettings().screenshots.keepDays;
+  if (keepDays <= 0) return; // 0 = 不限期
+  const cutoff = Date.now() - keepDays * 24 * 60 * 60 * 1000;
+  for (const row of getRetainedScreenshotsBefore(cutoff)) {
+    removeFileAndMark(row.id, row.path);
+  }
+  // 兜底：按文件名时间戳扫一遍目录，清掉 DB 行已不存在的孤儿文件（清库/导入备份会替换 DB，
+  // 旧原图会失去对应行，仅按行清理永远扫不到它们）。文件名即截图时刻毫秒时间戳（见 capture()）。
+  try {
+    for (const name of fs.readdirSync(resolveScreenshotsDir())) {
+      const m = /^(\d{10,})\.(jpg|png)$/.exec(name);
+      if (m && Number(m[1]) < cutoff) {
+        try {
+          fs.unlinkSync(path.join(resolveScreenshotsDir(), name));
+        } catch {
+          // 单个文件删除失败不影响其余
+        }
+      }
+    }
+  } catch {
+    // 目录不存在等情况直接忽略
   }
 }
 

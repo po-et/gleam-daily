@@ -272,6 +272,20 @@ export function getStaleScreenshots(beforeTs: number): ScreenshotRow[] {
   return rows.map(rowToScreenshot);
 }
 
+/**
+ * v1.4.1 保留期限清理（SPEC §8）：找出 `beforeTs` 之前、因「保留原始截图」而留在磁盘上的
+ * 已分析截图（deleted = 0 且 status = 'analyzed'），供按 keepDays 期限删除原图用。
+ * 只删文件不删分析行——一句话摘要仍是时间线与报告素材。
+ */
+export function getRetainedScreenshotsBefore(beforeTs: number): ScreenshotRow[] {
+  const rows = getDb()
+    .prepare<[number], ScreenshotDbRow>(
+      `SELECT * FROM screenshots WHERE deleted = 0 AND status = 'analyzed' AND ts < ? ORDER BY ts ASC`,
+    )
+    .all(beforeTs);
+  return rows.map(rowToScreenshot);
+}
+
 // ---------------------------------------------------------------------------
 // notes
 // ---------------------------------------------------------------------------

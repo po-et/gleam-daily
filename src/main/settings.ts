@@ -44,6 +44,7 @@ function defaultPersistedSettings(): PersistedSettings {
       enabled: true,
       intervalMin: 5,
       keepAfterAnalysis: false,
+      keepDays: 0, // 0 = 不限期。默认不改变既有用户「永久保留」的行为，误删风险大于磁盘占用
     },
     git: {
       repoPaths: [],

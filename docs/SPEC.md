@@ -543,3 +543,7 @@ clearAllData() 追加清空 manual_records 与 meta。
 2. 详尽日报真实生成：与标准档同素材对比，字数 ≥ 600、包含 ≥3 个素材中的专有名词与 ≥3 个具体数字；两段式清单在日志可见；concise 档 ≤ 350 字左右。
 3. 视觉摘要新 prompt 真实截图验证：输出含专有名词、≤2 句。
 4. 旧 settings 平滑迁移（defaultDetail 默认 standard）；typecheck 双绿；打包版抽查应用记录 + 详尽生成。
+
+### 8.1 保留期限（v1.4.1 增补，属 §8 截图流水线）
+
+`settings.screenshots.keepDays`（默认 0 = 不限期）：>0 时，24h 清理任务额外删除 `ts < now - keepDays 天` 且 `status='analyzed'、deleted=0` 的原图文件（只删文件并标记 deleted，分析摘要行保留，不影响时间线与报告素材）。该清理不看当前 keepAfterAnalysis 开关（关闭保留后旧图同样按期清）；settings.set 变更 keepDays 时立即执行一次。UI：设置 → 截图 → 「保留原始截图」开启时显示「保留期限」下拉（不限期/7/30/90 天）。

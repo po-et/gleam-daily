@@ -45,7 +45,7 @@ import { resolveScreenshotsDir } from './paths';
 import { collectMaterial } from './reports/collect';
 import { generateReport } from './reports/generator';
 import { getScheduledReportStatus, runScheduledReportNow } from './scheduler';
-import { analyzeNow, setScreenshotsEnabled } from './screenshots';
+import { analyzeNow, cleanupRetainedFiles, setScreenshotsEnabled } from './screenshots';
 import { getSettings, setSecret, setSettings } from './settings';
 import * as stats from './stats';
 import { broadcastStatus as broadcastTrackerStatus, getTrackerStatus, resetCurrentSession, setTrackingEnabled } from './tracker';
@@ -229,6 +229,8 @@ export function registerIpcHandlers(): void {
     const next = setSettings(patch);
     // v1.3：settings.mcp 变更后热启停 MCP Server（幂等，内部只在状态变化时动作）。
     syncMcpFromSettings();
+    // v1.4.1：保留期限变更立即生效一次（用户改成 7 天就期望马上腾出磁盘空间）。
+    if (patch.screenshots?.keepDays !== undefined) cleanupRetainedFiles();
     return next;
   });
 

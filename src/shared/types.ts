@@ -215,6 +215,7 @@ export interface Settings {
     enabled: boolean; // 默认 true（截图→AI 提炼→删图，产品核心体验）
     intervalMin: number; // 默认 5
     keepAfterAnalysis: boolean; // 默认 false
+    keepDays: number; // v1.4.1：保留原始截图的期限（天）。0 = 不限期（默认）；>0 时 24h 清理任务删除超期原图
   };
   git: { repoPaths: string[]; scanRoots: string[]; authorFilter: string };
   ai: {

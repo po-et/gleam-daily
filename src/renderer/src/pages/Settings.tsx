@@ -31,7 +31,7 @@ import './Settings.css';
 const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   tracking: { enabled: false, sampleIntervalSec: 10, idleThresholdSec: 180, excludedApps: [] },
-  screenshots: { enabled: false, intervalMin: 5, keepAfterAnalysis: false },
+  screenshots: { enabled: false, intervalMin: 5, keepAfterAnalysis: false, keepDays: 0 },
   git: { repoPaths: [], scanRoots: [], authorFilter: '' },
   ai: {
     provider: 'claude-cli',
@@ -67,6 +67,14 @@ const SHOT_INTERVAL_OPTIONS = [
   { value: '5', label: '5 分钟' },
   { value: '10', label: '10 分钟' },
   { value: '15', label: '15 分钟' },
+];
+
+// v1.4.1：保留原始截图的期限。0 = 不限期（默认，不悄悄删用户留的图）。
+const KEEP_DAYS_OPTIONS = [
+  { value: '0', label: '不限期' },
+  { value: '7', label: '保留 7 天' },
+  { value: '30', label: '保留 30 天' },
+  { value: '90', label: '保留 90 天' },
 ];
 
 const THEME_OPTIONS: { value: Settings['theme']; label: string }[] = [
@@ -623,6 +631,20 @@ export default function SettingsPage(): JSX.Element {
             }
           />
         </FieldRow>
+        {settings.screenshots.keepAfterAnalysis && (
+          <FieldRow label="保留期限" desc="超过期限的原图会被自动删除（分析摘要不受影响）。按当前频率，每天约占 30-40MB。">
+            <Select
+              value={String(settings.screenshots.keepDays)}
+              options={KEEP_DAYS_OPTIONS}
+              onChange={(v) =>
+                commit(
+                  { ...settings, screenshots: { ...settings.screenshots, keepDays: Number(v) } },
+                  { screenshots: { keepDays: Number(v) } },
+                )
+              }
+            />
+          </FieldRow>
+        )}
       </Card>
 
       {/* 3. Git */}
